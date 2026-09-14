@@ -1,0 +1,7 @@
+﻿,n,accuracy,accuracy_pm1,balanced_accuracy,f1_macro,f1_weighted,ordinal_mae,weighted_kappa
+Mayoria,4.0,0.25,0.25,0.25,0.1,0.1,2.5,0.0
+Persistencia,4.0,0.5,1.0,0.5,0.3333,0.5,0.5,0.75
+1-HistGB,4.0,0.75,1.0,0.75,0.6,0.75,0.25,0.8571
+2-MLPOrdinal,4.0,0.5,1.0,0.5,0.3333,0.5,0.5,0.75
+3-RegresionOrdinal,4.0,0.0,0.5,0.0,0.0,0.0,3.0,-0.0588
+4-LightGBM,4.0,1.0,1.0,1.0,1.0,1.0,0.0,1.0
