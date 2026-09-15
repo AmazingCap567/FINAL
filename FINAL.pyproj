@@ -51,6 +51,7 @@
     <Content Include="outputs\analisis\auditoria\entidades_no_homologadas.csv" />
     <Content Include="outputs\analisis\auditoria\filas_sin_dato_financiero.csv" />
     <Content Include="outputs\metricas_holdout_todos_los_modelos.csv" />
+    <Content Include="Peru_SBS.html" />
     <Content Include="README.md" />
     <Content Include="requirements.txt" />
   </ItemGroup>
@@ -116,6 +117,7 @@
     <Compile Include="motor\modelos\__init__.py" />
     <Compile Include="motor\utils.py" />
     <Compile Include="motor\__init__.py" />
+    <Compile Include="scripts\actualizar_interfaz.py" />
     <Compile Include="scripts\generar_dataset_variables.py" />
     <Compile Include="scripts\run_evaluacion.py" />
     <Compile Include="scripts\run_prediccion.py" />

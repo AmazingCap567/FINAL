@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Panel de Estabilidad del Sistema Financiero Peruano</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #F3F5F8; }
+  * { box-sizing: border-box; }
+  input[type="range"] { cursor: pointer; }
+  table { border-collapse: collapse; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Treemap, ReferenceLine } = Recharts;
+const { useState, useMemo } = React;
+
+/* ============================================================
+   1. PALETA Y TOKENS
+   ============================================================ */
+const LIGHT = {
+  navy: "#0B1E3D",
+  navyLight: "#152A4E",
+  navyLine: "#22335A",
+  navyText: "#0B1E3D",
+  slate: "#4B5768",
+  slateSoft: "#8A93A3",
+  paper: "#F3F5F8",
+  panel: "#FFFFFF",
+  panelAlt: "#FAFBFC",
+  line: "#E2E6ED",
+  chipBg: "#F1F2F4",
+  emerald: "#0E8F63",
+  emeraldSoft: "#DFF2E9",
+  crimson: "#BE2E42",
+  crimsonSoft: "#FBE4E7",
+  amber: "#B0791A",
+  amberSoft: "#F6E9D2",
+  gold: "#A9812F",
+};
+
+const DARK = {
+  navy: "#0B1E3D",
+  navyLight: "#152A4E",
+  navyLine: "#2B3E63",
+  navyText: "#E8ECF4",
+  slate: "#B7C0D1",
+  slateSoft: "#7C8AA3",
+  paper: "#0A0F1A",
+  panel: "#111A2C",
+  panelAlt: "#0D1524",
+  line: "#243352",
+  chipBg: "#1A2438",
+  emerald: "#3FCB93",
+  emeraldSoft: "#123527",
+  crimson: "#F0768A",
+  crimsonSoft: "#3A1620",
+  amber: "#E3B04B",
+  amberSoft: "#3A2C10",
+  gold: "#D8B463",
+};
+
+// Paleta activa: se muta con Object.assign según el modo (claro/oscuro) en cada render.
+let C = { ...LIGHT };
+
+const serif = "Georgia, 'Iowan Old Style', 'Times New Roman', serif";
+
+/* ------------------------------------------------------------
+   Iconos propios en SVG (sustituyen a lucide-react para que este
+   archivo funcione como HTML autocontenido, sin dependencias npm)
+   ------------------------------------------------------------ */
+function makeIcon(children) {
+  return function Icon({ size = 16, color = "currentColor", className = "", style }) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+        {children}
+      </svg>
+    );
+  };
+}
+
+const Landmark = makeIcon(<><line x1="3" y1="21" x2="21" y2="21" /><line x1="5" y1="21" x2="5" y2="10" /><line x1="9" y1="21" x2="9" y2="10" /><line x1="15" y1="21" x2="15" y2="10" /><line x1="19" y1="21" x2="19" y2="10" /><polygon points="12,3 21,9 3,9" /></>);
+const TrendingUp = makeIcon(<><polyline points="3,17 9,11 13,15 21,6" /><polyline points="14,6 21,6 21,13" /></>);
+const TrendingDown = makeIcon(<><polyline points="3,7 9,13 13,9 21,18" /><polyline points="14,18 21,18 21,11" /></>);
+const ShieldCheck = makeIcon(<><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /><polyline points="9,12 11,14 15,10" /></>);
+const Percent = makeIcon(<><line x1="5" y1="19" x2="19" y2="5" /><circle cx="7.5" cy="7.5" r="2.2" /><circle cx="16.5" cy="16.5" r="2.2" /></>);
+const Building2 = makeIcon(<><rect x="4" y="3" width="16" height="18" /><line x1="8" y1="7" x2="8" y2="7.01" /><line x1="12" y1="7" x2="12" y2="7.01" /><line x1="16" y1="7" x2="16" y2="7.01" /><line x1="8" y1="11" x2="8" y2="11.01" /><line x1="12" y1="11" x2="12" y2="11.01" /><line x1="16" y1="11" x2="16" y2="11.01" /><line x1="8" y1="15" x2="8" y2="15.01" /><line x1="12" y1="15" x2="12" y2="15.01" /><line x1="16" y1="15" x2="16" y2="15.01" /></>);
+const Filter = makeIcon(<polygon points="4,4 20,4 14,12 14,19 10,21 10,12" />);
+const CircleDollarSign = makeIcon(<><circle cx="12" cy="12" r="9" /><path d="M12 7v10M9.5 9.5c0-1.4 1.2-2 2.5-2s2.5.7 2.5 2c0 2.5-5 1.5-5 4 0 1.3 1.2 2 2.5 2s2.5-.6 2.5-2" /></>);
+const Activity = makeIcon(<polyline points="2,13 7,13 9,7 13,19 16,10 18,13 22,13" />);
+const AlertTriangle = makeIcon(<><path d="M12 3l10 18H2z" /><line x1="12" y1="10" x2="12" y2="14" /><line x1="12" y1="17" x2="12" y2="17.01" /></>);
+const SlidersHorizontal = makeIcon(<><line x1="3" y1="6" x2="21" y2="6" /><circle cx="9" cy="6" r="1.8" /><line x1="3" y1="12" x2="21" y2="12" /><circle cx="16" cy="12" r="1.8" /><line x1="3" y1="18" x2="21" y2="18" /><circle cx="11" cy="18" r="1.8" /></>);
+const CalendarRange = makeIcon(<><rect x="3" y="4" width="18" height="17" rx="1" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="14" x2="12" y2="14" /></>);
+const Gauge = makeIcon(<><path d="M4 15a8 8 0 1 1 16 0" /><line x1="12" y1="15" x2="16" y2="10" /><line x1="12" y1="15" x2="12" y2="15.01" /></>);
+const ScrollText = makeIcon(<><path d="M6 3h12v15a3 3 0 0 1-3 3H6z" /><path d="M6 21a3 3 0 0 1-3-3V6" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="9" y1="12" x2="15" y2="12" /></>);
+const ChevronDown = makeIcon(<polyline points="6,9 12,15 18,9" />);
+const X = makeIcon(<><line x1="5" y1="5" x2="19" y2="19" /><line x1="19" y1="5" x2="5" y2="19" /></>);
+const Info = makeIcon(<><circle cx="12" cy="12" r="9" /><line x1="12" y1="11" x2="12" y2="16" /><line x1="12" y1="8" x2="12" y2="8.01" /></>);
+const PiggyBank = makeIcon(<><path d="M4 12a7 7 0 0 1 12-5l2-1v3l2 1v3l-2 1a7 7 0 0 1-6 5H8l-1 3H5l0-3a5 5 0 0 1-1-4z" /><line x1="9" y1="9" x2="9" y2="9.01" /></>);
+const LayoutGrid = makeIcon(<><rect x="3" y="3" width="8" height="8" /><rect x="13" y="3" width="8" height="8" /><rect x="3" y="13" width="8" height="8" /><rect x="13" y="13" width="8" height="8" /></>);
+const LineChartIcon = makeIcon(<><polyline points="3,3 3,21 21,21" /><polyline points="6,16 10,10 14,13 20,5" /></>);
+const History = makeIcon(<><path d="M3 12a9 9 0 1 0 3-6.7" /><polyline points="3,4 3,9 8,9" /><polyline points="12,7 12,12 16,14" /></>);
+const Sun = makeIcon(<><circle cx="12" cy="12" r="4" /><line x1="12" y1="2" x2="12" y2="4" /><line x1="12" y1="20" x2="12" y2="22" /><line x1="4" y1="12" x2="2" y2="12" /><line x1="22" y1="12" x2="20" y2="12" /><line x1="5" y1="5" x2="6.5" y2="6.5" /><line x1="17.5" y1="17.5" x2="19" y2="19" /><line x1="19" y1="5" x2="17.5" y2="6.5" /><line x1="6.5" y1="17.5" x2="5" y2="19" /></>);
+const Moon = makeIcon(<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" />);
+const CalendarClock = makeIcon(<><rect x="3" y="4" width="18" height="17" rx="1" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" /><circle cx="15.5" cy="15.5" r="4" /><line x1="15.5" y1="13.5" x2="15.5" y2="15.5" /><line x1="15.5" y1="15.5" x2="17" y2="16.5" /></>);
+const Trophy = makeIcon(<><path d="M8 4h8v5a4 4 0 0 1-8 0z" /><path d="M8 5H4v2a3 3 0 0 0 4 2.8" /><path d="M16 5h4v2a3 3 0 0 1-4 2.8" /><line x1="12" y1="13" x2="12" y2="17" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="17" x2="12" y2="20" /></>);
+const BarChart2 = makeIcon(<><line x1="5" y1="21" x2="19" y2="21" /><rect x="6" y="11" width="3" height="8" /><rect x="14.5" y="7" width="3" height="12" /><rect x="10.25" y="14" width="3" height="5" /></>);
+
+const TIPOS = [
+  { id: "banco", label: "Bancos", color: "#3E6FB0" },
+  { id: "cmac", label: "Cajas Municipales", color: "#1F6F5C" },
+  { id: "crac", label: "Cajas Rurales", color: "#8A4B2B" },
+  { id: "financiera", label: "Financieras", color: "#5B4B8A" },
+];
+
+const ENTIDADES = {
+  banco: ["BCP", "BBVA Perú", "Interbank", "Scotiabank Perú", "BanBif", "Mibanco", "Banco Pichincha", "Banco Falabella", "Banco Ripley", "Banco GNB", "Compartamos Banco"],
+  cmac: ["CMAC Arequipa", "CMAC Cusco", "CMAC Huancayo", "CMAC Ica", "CMAC Piura", "CMAC Trujillo", "CMAC Tacna", "CMAC Maynas", "CMAC Paita", "CMAC del Santa", "CMCP Lima"],
+  crac: ["CRAC Los Andes", "CRAC Incasur", "CRAC del Centro", "CRAC Prymera", "CRAC Cencosud Scotia"],
+  financiera: ["Financiera Confianza", "Financiera Qapaq", "Financiera Surgir", "Financiera Proempresa", "Mitsui Auto Finance", "Infinance XP"],
+};
+
+const YEARS = Array.from({ length: 12 }, (_, i) => 2015 + i); // 2015..2026
+
+/* ------------------------------------------------------------
+   Historial REAL de clasificación de riesgo por banco (2012-2026)
+   Extraído y estructurado a partir de los reportes semestrales de
+   clasificadoras de riesgo (Apoyo, Class, JCR, Microrate, Moody's
+   Local, PCR) recopilados para este panel.
+   ------------------------------------------------------------ */
+const RATING_PERIODS = ["2012-mar", "2012-sep", "2013-mar", "2013-sep", "2014-mar", "2014-sep", "2015-mar", "2015-sep", "2016-mar", "2016-sep", "2017-mar", "2017-sep", "2018-mar", "2018-sep", "2019-mar", "2019-sep", "2020-mar", "2020-sep", "2021-mar", "2021-sep", "2022-mar", "2022-sep", "2023-mar", "2023-sep", "2024-mar", "2024-sep", "2025-mar", "2025-sep", "2026-mar"];
+
+const RATINGS_DATA = {"ALFIN BANCO": {"2012-mar": {"Apoyo": "B-", "Moodys": "B"}, "2012-sep": {"Apoyo": "B-", "Moodys": "B"}, "2013-mar": {"Apoyo": "B-", "Moodys": "B"}, "2013-sep": {"Apoyo": "B-", "Class": "B", "Moodys": "B"}, "2014-mar": {"Class": "B", "Moodys": "B"}, "2014-sep": {"Class": "B", "Moodys": "B"}, "2015-mar": {"Class": "B", "Moodys": "B"}, "2015-sep": {"Class": "B-", "Moodys": "B-"}, "2016-mar": {"Class": "B-", "Moodys": "B-"}, "2016-sep": {"Class": "B-", "Moodys": "B-"}, "2017-mar": {"Class": "B-", "Moodys": "B-"}, "2017-sep": {"Class": "B-", "Moodys": "B-"}, "2018-mar": {"Class": "B-", "Moodys": "B-"}, "2018-sep": {"Class": "B-", "Moodys": "B-"}, "2019-mar": {"Class": "B-", "Moodys": "B-"}, "2019-sep": {"Class": "B-", "Moodys": "B-"}, "2020-mar": {"Class": "B-", "Moodys": "B-"}, "2020-sep": {"Class": "B-", "Moodys": "B-"}, "2021-mar": {"Class": "B-", "Moodys": "B-"}, "2021-sep": {"Class": "B-", "JCR": "B-", "Moodys": "C+"}, "2022-mar": {"Class": "C+", "JCR": "B-", "Moodys": "C-"}, "2022-sep": {"Class": "C-", "JCR": "B-"}, "2023-mar": {"JCR": "B", "PCR": "B-"}, "2023-sep": {"JCR": "B+", "PCR": "B+"}, "2024-mar": {"JCR": "B+", "PCR": "B+"}, "2024-sep": {"JCR": "B+", "PCR": "B+"}, "2025-mar": {"JCR": "B+", "PCR": "B+"}, "2025-sep": {"JCR": "B+", "PCR": "B+"}, "2026-mar": {"JCR": "A-", "PCR": "B+"}}, "BANBIF": {"2012-mar": {"Class": "A", "PCR": "A"}, "2012-sep": {"Class": "A", "PCR": "A"}, "2013-mar": {"Class": "A", "PCR": "A"}, "2013-sep": {"Class": "A", "PCR": "A"}, "2014-mar": {"Class": "A+", "PCR": "A+"}, "2014-sep": {"Class": "A+", "PCR": "A+"}, "2015-mar": {"Class": "A+", "PCR": "A+"}, "2015-sep": {"Class": "A+", "PCR": "A+"}, "2016-mar": {"Class": "A+", "PCR": "A+"}, "2016-sep": {"Class": "A+", "PCR": "A+"}, "2017-mar": {"Class": "A+", "PCR": "A+"}, "2017-sep": {"Class": "A+", "PCR": "A+"}, "2018-mar": {"Class": "A+", "PCR": "A+"}, "2018-sep": {"Class": "A+", "PCR": "A+"}, "2019-mar": {"Class": "A+", "PCR": "A+"}, "2019-sep": {"Class": "A+", "PCR": "A+"}, "2020-mar": {"Class": "A+", "PCR": "A+"}, "2020-sep": {"Class": "A+", "PCR": "A+"}, "2021-mar": {"Class": "A+", "PCR": "A+"}, "2021-sep": {"Class": "A+", "PCR": "A+"}, "2022-mar": {"Class": "A+", "PCR": "A+"}, "2022-sep": {"Class": "A", "PCR": "A+"}, "2023-mar": {"Moodys": "A", "PCR": "A+"}, "2023-sep": {"Moodys": "A", "PCR": "A+"}, "2024-mar": {"Moodys": "A", "PCR": "A+"}, "2024-sep": {"Moodys": "A", "PCR": "A+"}, "2025-mar": {"Moodys": "A", "PCR": "A+"}, "2025-sep": {"Moodys": "A", "PCR": "A+"}, "2026-mar": {"Moodys": "A", "PCR": "A+"}}, "BANCO DE CREDITO": {"2012-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2012-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2013-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2013-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2014-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2014-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2015-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2015-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2016-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2016-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2017-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2017-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2018-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2018-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2019-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2019-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2020-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2020-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2021-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2021-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2022-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2022-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2023-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2023-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2024-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2024-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2025-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2025-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2026-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}}, "BANCO EFECTIVA": {"2012-mar": {"Class": "B+", "Moodys": "B"}, "2012-sep": {"Class": "B+", "Moodys": "B"}, "2013-mar": {"Class": "B+", "Moodys": "B"}, "2013-sep": {"Apoyo": "B+", "Class": "B+", "Moodys": "B"}, "2014-mar": {"Apoyo": "B+", "Class": "B+"}, "2014-sep": {"Apoyo": "B+", "Class": "B+"}, "2015-mar": {"Apoyo": "B+", "Class": "B+"}, "2015-sep": {"Apoyo": "B+", "Class": "B+"}, "2016-mar": {"Apoyo": "B+", "Class": "B+"}, "2016-sep": {"Apoyo": "B+", "Class": "B+"}, "2017-mar": {"Apoyo": "B+", "Class": "B+"}, "2017-sep": {"Apoyo": "B+", "Class": "B+"}, "2018-mar": {"Apoyo": "B+", "Class": "B+"}, "2018-sep": {"Apoyo": "B+", "Class": "B+"}, "2019-mar": {"Apoyo": "B+", "Class": "A-"}, "2019-sep": {"Class": "A-", "PCR": "A-"}, "2020-mar": {"Class": "A-", "PCR": "A-"}, "2020-sep": {"Class": "A-", "PCR": "A-"}, "2021-mar": {"Class": "A-", "PCR": "A-"}, "2021-sep": {"Class": "A-", "PCR": "A-"}, "2022-mar": {"Class": "A-", "PCR": "A-"}, "2022-sep": {"Class": "A-", "JCR": "A", "PCR": "A-"}, "2023-mar": {"JCR": "A", "Moodys": "A-", "PCR": "A-"}, "2023-sep": {"JCR": "A", "Moodys": "A-", "PCR": "A-"}, "2024-mar": {"JCR": "A", "Moodys": "A-", "PCR": "A-"}, "2024-sep": {"JCR": "A", "Moodys": "A-", "PCR": "A-"}, "2025-mar": {"JCR": "A", "Moodys": "A-", "PCR": "A-"}, "2025-sep": {"JCR": "A", "Moodys": "A-", "PCR": "A-"}, "2026-mar": {"JCR": "A", "Moodys": "A-", "PCR": "A-"}}, "BANCO FALABELLA": {"2012-mar": {"Apoyo": "A-", "Class": "A-", "Moodys": "A-"}, "2012-sep": {"Apoyo": "A-", "Class": "A-", "Moodys": "A-"}, "2013-mar": {"Apoyo": "A-", "Class": "A-", "Moodys": "A-"}, "2013-sep": {"Apoyo": "A-", "Moodys": "A-"}, "2014-mar": {"Apoyo": "A-", "Moodys": "A-"}, "2014-sep": {"Apoyo": "A-", "Moodys": "A-"}, "2015-mar": {"Apoyo": "A-", "Moodys": "A-"}, "2015-sep": {"Apoyo": "A", "Moodys": "A-"}, "2016-mar": {"Apoyo": "A", "Moodys": "A-"}, "2016-sep": {"Apoyo": "A", "Moodys": "A-"}, "2017-mar": {"Apoyo": "A", "Class": "A", "Moodys": "A-"}, "2017-sep": {"Apoyo": "A", "Class": "A", "Moodys": "A-"}, "2018-mar": {"Apoyo": "A-", "Class": "A", "Moodys": "A-"}, "2018-sep": {"Class": "A", "Moodys": "A-"}, "2019-mar": {"Apoyo": "A-", "Class": "A", "Moodys": "A-"}, "2019-sep": {"Apoyo": "A-", "Class": "A", "Moodys": "A-"}, "2020-mar": {"Apoyo": "A-", "Class": "A"}, "2020-sep": {"Apoyo": "A-", "Class": "A"}, "2021-mar": {"Apoyo": "A-", "Class": "A-"}, "2021-sep": {"Apoyo": "A-", "Class": "A-"}, "2022-mar": {"Apoyo": "A-", "Class": "A-"}, "2022-sep": {"Apoyo": "A-", "Class": "A-"}, "2023-mar": {"Apoyo": "A-", "Moodys": "A-"}, "2023-sep": {"Apoyo": "A-", "Moodys": "A-"}, "2024-mar": {"Apoyo": "A-", "Moodys": "A-"}, "2024-sep": {"Apoyo": "A-", "Moodys": "A-"}, "2025-mar": {"Apoyo": "A-", "Moodys": "A-"}, "2025-sep": {"Apoyo": "A-", "Moodys": "A-"}, "2026-mar": {"Apoyo": "A", "Moodys": "A-"}}, "BANCO GNB": {"2012-mar": {"Apoyo": "A", "Moodys": "A-"}, "2012-sep": {"Apoyo": "A", "Moodys": "A-"}, "2013-mar": {"Apoyo": "A", "Moodys": "A-"}, "2013-sep": {"Apoyo": "A-", "Moodys": "A-"}, "2014-mar": {"Apoyo": "A-", "Class": "A", "Moodys": "A-"}, "2014-sep": {"Class": "A", "Moodys": "A-"}, "2015-mar": {"Class": "A", "Moodys": "A-"}, "2015-sep": {"Class": "A", "Moodys": "A-"}, "2016-mar": {"Class": "A", "Moodys": "A-"}, "2016-sep": {"Class": "A", "Moodys": "A-", "PCR": "A"}, "2017-mar": {"Class": "A", "PCR": "A"}, "2017-sep": {"Class": "A", "PCR": "A"}, "2018-mar": {"Class": "A", "PCR": "A"}, "2018-sep": {"Class": "A", "PCR": "A"}, "2019-mar": {"Class": "A", "PCR": "A"}, "2019-sep": {"Class": "A", "PCR": "A"}, "2020-mar": {"Class": "A", "PCR": "A"}, "2020-sep": {"Class": "A", "PCR": "A"}, "2021-mar": {"Class": "A", "PCR": "A"}, "2021-sep": {"Class": "A", "PCR": "A"}, "2022-mar": {"Class": "A", "PCR": "A"}, "2022-sep": {"Class": "A", "PCR": "A"}, "2023-mar": {"Moodys": "A", "PCR": "A"}, "2023-sep": {"Moodys": "A", "PCR": "A"}, "2024-mar": {"Moodys": "A", "PCR": "A"}, "2024-sep": {"Moodys": "A", "PCR": "A"}, "2025-mar": {"Moodys": "A", "PCR": "A"}, "2025-sep": {"Moodys": "A", "PCR": "A"}, "2026-mar": {"Moodys": "A", "PCR": "A"}}, "BANCO PICHINCHA": {"2012-mar": {"Moodys": "A-", "PCR": "A-"}, "2012-sep": {"Moodys": "A-", "PCR": "A-"}, "2013-mar": {"Moodys": "A-", "PCR": "A-"}, "2013-sep": {"Moodys": "A-", "PCR": "A-"}, "2014-mar": {"Moodys": "A-", "PCR": "A"}, "2014-sep": {"Class": "A-", "PCR": "A"}, "2015-mar": {"Class": "A-", "PCR": "A"}, "2015-sep": {"Class": "A-", "PCR": "A"}, "2016-mar": {"Class": "A-", "PCR": "A"}, "2016-sep": {"Class": "A-", "PCR": "A"}, "2017-mar": {"Class": "A-", "PCR": "A"}, "2017-sep": {"Class": "A-", "PCR": "A"}, "2018-mar": {"Class": "A-", "PCR": "A"}, "2018-sep": {"Class": "A-", "PCR": "A"}, "2019-mar": {"Class": "A-", "PCR": "A"}, "2019-sep": {"Class": "A-", "PCR": "A"}, "2020-mar": {"Class": "A-", "PCR": "A"}, "2020-sep": {"Class": "A-", "PCR": "A"}, "2021-mar": {"Class": "A-", "PCR": "A"}, "2021-sep": {"Class": "A-", "PCR": "A"}, "2022-mar": {"Class": "A-", "PCR": "A-"}, "2022-sep": {"Class": "A-", "PCR": "A-"}, "2023-mar": {"Moodys": "A-", "PCR": "A-"}, "2023-sep": {"Moodys": "A-", "PCR": "A-"}, "2024-mar": {"Moodys": "A-", "PCR": "A-"}, "2024-sep": {"Moodys": "A-", "PCR": "A-"}, "2025-mar": {"Moodys": "A-", "PCR": "A-"}, "2025-sep": {"Apoyo": "A-", "Moodys": "A-"}, "2026-mar": {"Apoyo": "A-", "Moodys": "A-"}}, "BANCO RIPLEY": {"2012-mar": {"Apoyo": "B+", "Class": "A-"}, "2012-sep": {"Apoyo": "B+", "Class": "A-"}, "2013-mar": {"Apoyo": "B+", "Class": "A-"}, "2013-sep": {"Apoyo": "B+", "Class": "A-"}, "2014-mar": {"Apoyo": "B+", "Class": "A-"}, "2014-sep": {"Apoyo": "B+", "Class": "A-"}, "2015-mar": {"Apoyo": "B+", "Class": "A-"}, "2015-sep": {"Apoyo": "B+", "Class": "A-"}, "2016-mar": {"Apoyo": "B+", "Class": "A-"}, "2016-sep": {"Apoyo": "B+", "Class": "A-"}, "2017-mar": {"Apoyo": "B+", "Class": "A-", "Moodys": "A-"}, "2017-sep": {"Apoyo": "B+", "Class": "A-", "Moodys": "A-"}, "2018-mar": {"Class": "A-", "Moodys": "A-"}, "2018-sep": {"Class": "A-", "Moodys": "A-"}, "2019-mar": {"Class": "A-", "Moodys": "A-"}, "2019-sep": {"Class": "A-", "Moodys": "A-"}, "2020-mar": {"Class": "A-", "Moodys": "A-"}, "2020-sep": {"Class": "A-", "Moodys": "B+"}, "2021-mar": {"Class": "B+", "Moodys": "B+"}, "2021-sep": {"Class": "B+", "Moodys": "B+"}, "2022-mar": {"Class": "B+", "Moodys": "B+"}, "2022-sep": {"Moodys": "B+", "PCR": "B+"}, "2023-mar": {"Moodys": "B+", "PCR": "B+"}, "2023-sep": {"Moodys": "B+", "PCR": "B+"}, "2024-mar": {"Moodys": "B+", "PCR": "B+"}, "2024-sep": {"Moodys": "B+", "PCR": "B+"}, "2025-mar": {"Moodys": "B+", "PCR": "B+"}, "2025-sep": {"Moodys": "B+", "PCR": "B+"}, "2026-mar": {"Moodys": "B+", "PCR": "B+"}}, "BANCOM": {"2012-mar": {"Moodys": "B+", "PCR": "B+"}, "2012-sep": {"Moodys": "B", "PCR": "B+"}, "2013-mar": {"Moodys": "B", "PCR": "B+"}, "2013-sep": {"Moodys": "B", "PCR": "B+"}, "2014-mar": {"Moodys": "B", "PCR": "B+"}, "2014-sep": {"Moodys": "B", "PCR": "B+"}, "2015-mar": {"Moodys": "B", "PCR": "B+"}, "2015-sep": {"Moodys": "B", "PCR": "B"}, "2016-mar": {"Moodys": "B", "PCR": "B"}, "2016-sep": {"Moodys": "B", "PCR": "B"}, "2017-mar": {"Moodys": "B+", "PCR": "B+"}, "2017-sep": {"Moodys": "B+", "PCR": "B+"}, "2018-mar": {"Moodys": "B+", "PCR": "B+"}, "2018-sep": {"Moodys": "B+", "PCR": "B+"}, "2019-mar": {"Moodys": "B+", "PCR": "B+"}, "2019-sep": {"Moodys": "B+", "PCR": "B+"}, "2020-mar": {"Moodys": "B+", "PCR": "B+"}, "2020-sep": {"Moodys": "B+", "PCR": "B+"}, "2021-mar": {"Moodys": "B+", "PCR": "B+"}, "2021-sep": {"Moodys": "B+", "PCR": "B+"}, "2022-mar": {"Moodys": "B+", "PCR": "B+"}, "2022-sep": {"Moodys": "B+", "PCR": "B+"}, "2023-mar": {"Moodys": "B+", "PCR": "B+"}, "2023-sep": {"Moodys": "B+", "PCR": "B+"}, "2024-mar": {"Moodys": "B+", "PCR": "B+"}, "2024-sep": {"Moodys": "B+", "PCR": "B+"}, "2025-mar": {"Moodys": "B+", "PCR": "B+"}, "2025-sep": {"Moodys": "B+", "PCR": "B+"}, "2026-mar": {"Moodys": "B+", "PCR": "B+"}}, "BBVA": {"2012-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2012-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2013-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2013-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2014-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2014-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2015-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2015-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2016-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2016-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2017-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2017-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2018-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2018-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2019-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2019-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2020-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2020-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2021-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2021-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2022-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2022-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2023-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2023-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2024-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2024-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2025-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2025-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2026-mar": {"Apoyo": "A+", "Moodys": "A+"}}, "BN. SANTANDER CONS.": {"2012-mar": {"Apoyo": "A", "Class": "A"}, "2012-sep": {"Apoyo": "A", "Class": "A"}, "2013-mar": {"Apoyo": "A", "Class": "A"}, "2013-sep": {"Apoyo": "A", "Class": "A"}, "2014-mar": {"Apoyo": "A", "Class": "A"}, "2014-sep": {"Apoyo": "A", "Class": "A"}, "2015-mar": {"Apoyo": "A", "Class": "A"}, "2015-sep": {"Apoyo": "A", "Class": "A"}, "2016-mar": {"Apoyo": "A", "Class": "A"}, "2016-sep": {"Apoyo": "A", "Class": "A"}, "2017-mar": {"Apoyo": "A", "Class": "A"}, "2017-sep": {"Apoyo": "A", "Class": "A"}, "2018-mar": {"Apoyo": "A", "Moodys": "A"}, "2018-sep": {"Apoyo": "A", "Moodys": "A"}, "2019-mar": {"Apoyo": "A", "Moodys": "A"}, "2019-sep": {"Apoyo": "A", "Moodys": "A"}, "2020-mar": {"Apoyo": "A", "Moodys": "A"}, "2020-sep": {"Apoyo": "A", "Moodys": "A"}, "2021-mar": {"Apoyo": "A", "Moodys": "A"}, "2021-sep": {"Apoyo": "A", "Moodys": "A"}, "2022-mar": {"Apoyo": "A", "Moodys": "A"}, "2022-sep": {"Apoyo": "A", "Moodys": "A"}, "2023-mar": {"Apoyo": "A", "Moodys": "A"}, "2023-sep": {"Apoyo": "A", "Moodys": "A"}, "2024-mar": {"Apoyo": "A", "Moodys": "A"}, "2024-sep": {"Apoyo": "A", "Moodys": "A"}, "2025-mar": {"Apoyo": "A", "Moodys": "A"}, "2025-sep": {"Apoyo": "A", "Moodys": "A"}, "2026-mar": {"Apoyo": "A", "Moodys": "A"}}, "CITIBANK DEL PERU": {"2012-mar": {"Apoyo": "A", "PCR": "A+"}, "2012-sep": {"Apoyo": "A", "PCR": "A+"}, "2013-mar": {"Apoyo": "A", "PCR": "A+"}, "2013-sep": {"Apoyo": "A", "PCR": "A+"}, "2014-mar": {"Apoyo": "A", "PCR": "A+"}, "2014-sep": {"Apoyo": "A", "PCR": "A+"}, "2015-mar": {"Apoyo": "A", "PCR": "A+"}, "2015-sep": {"Apoyo": "A", "PCR": "A+"}, "2016-mar": {"Apoyo": "A", "PCR": "A+"}, "2016-sep": {"Apoyo": "A", "PCR": "A+"}, "2017-mar": {"Apoyo": "A+", "PCR": "A+"}, "2017-sep": {"Apoyo": "A+", "PCR": "A+"}, "2018-mar": {"Apoyo": "A+", "PCR": "A+"}, "2018-sep": {"Apoyo": "A+", "PCR": "A+"}, "2019-mar": {"Apoyo": "A+", "PCR": "A+"}, "2019-sep": {"Apoyo": "A+", "PCR": "A+"}, "2020-mar": {"Apoyo": "A+", "PCR": "A+"}, "2020-sep": {"Apoyo": "A+", "PCR": "A+"}, "2021-mar": {"Apoyo": "A+", "PCR": "A+"}, "2021-sep": {"Apoyo": "A+", "PCR": "A+"}, "2022-mar": {"Apoyo": "A+", "PCR": "A+"}, "2022-sep": {"Apoyo": "A+", "PCR": "A+"}, "2023-mar": {"Apoyo": "A+", "PCR": "A+"}, "2023-sep": {"Apoyo": "A+", "PCR": "A+"}, "2024-mar": {"Apoyo": "A+", "PCR": "A+"}, "2024-sep": {"Apoyo": "A+", "PCR": "A+"}, "2025-mar": {"Apoyo": "A+", "PCR": "A+"}, "2025-sep": {"Apoyo": "A+", "PCR": "A+"}, "2026-mar": {"Apoyo": "A+", "PCR": "A+"}}, "COFIDE": {"2012-mar": {"Apoyo": "A", "Moodys": "A+"}, "2012-sep": {"Apoyo": "A", "Moodys": "A+"}, "2013-mar": {"Apoyo": "A", "Moodys": "A+"}, "2013-sep": {"Apoyo": "A", "Moodys": "A+"}, "2014-mar": {"Apoyo": "A", "Moodys": "A+"}, "2014-sep": {"Apoyo": "A", "Moodys": "A+"}, "2015-mar": {"Apoyo": "A", "Moodys": "A+"}, "2015-sep": {"Apoyo": "A", "Moodys": "A+"}, "2016-mar": {"Apoyo": "A", "Moodys": "A+"}, "2016-sep": {"Apoyo": "A", "Moodys": "A+"}, "2017-mar": {"Apoyo": "A", "Moodys": "A+"}, "2017-sep": {"Apoyo": "A", "Moodys": "A"}, "2018-mar": {"Apoyo": "A", "Moodys": "A"}, "2018-sep": {"Apoyo": "A", "Moodys": "A"}, "2019-mar": {"Class": "A", "Moodys": "A"}, "2019-sep": {"Class": "A", "Moodys": "A"}, "2020-mar": {"Class": "A", "Moodys": "A"}, "2020-sep": {"Class": "A", "Moodys": "A"}, "2021-mar": {"Class": "A", "Moodys": "A"}, "2021-sep": {"Apoyo": "A", "Class": "A", "Moodys": "A"}, "2022-mar": {"Apoyo": "A", "Class": "A"}, "2022-sep": {"Apoyo": "A", "Class": "A"}, "2023-mar": {"Apoyo": "A", "Moodys": "A"}, "2023-sep": {"Apoyo": "A", "Moodys": "A"}, "2024-mar": {"Apoyo": "A", "Moodys": "A"}, "2024-sep": {"Apoyo": "A", "Moodys": "A"}, "2025-mar": {"Apoyo": "A", "Moodys": "A"}, "2025-sep": {"Apoyo": "A", "Moodys": "A"}, "2026-mar": {"Apoyo": "A", "Moodys": "A"}}, "COMPARTAMOS BANCO": {"2012-mar": {"Apoyo": "B", "Class": "B"}, "2012-sep": {"Apoyo": "B", "Class": "B"}, "2013-mar": {"Apoyo": "B", "Class": "B"}, "2013-sep": {"Apoyo": "B", "Class": "B"}, "2014-mar": {"Apoyo": "B", "Class": "B"}, "2014-sep": {"Apoyo": "B", "Class": "B"}, "2015-mar": {"Apoyo": "B", "Class": "B"}, "2015-sep": {"Apoyo": "B+", "Class": "B"}, "2016-mar": {"Apoyo": "B+", "Class": "B+"}, "2016-sep": {"Apoyo": "B+", "Class": "B+"}, "2017-mar": {"Apoyo": "B+", "Class": "B+"}, "2017-sep": {"Apoyo": "B+", "Class": "B+"}, "2018-mar": {"Apoyo": "B+", "Class": "B+"}, "2018-sep": {"Apoyo": "B+", "Class": "A-"}, "2019-mar": {"Apoyo": "A-", "Class": "A-"}, "2019-sep": {"Apoyo": "A-", "Class": "A-"}, "2020-mar": {"Apoyo": "A-", "Class": "A-"}, "2020-sep": {"Apoyo": "A-", "Class": "A-"}, "2021-mar": {"Apoyo": "A-", "Class": "A-"}, "2021-sep": {"Apoyo": "A-", "Class": "A-"}, "2022-mar": {"Apoyo": "A-", "Class": "A-"}, "2022-sep": {"Apoyo": "A-", "Class": "A-"}, "2023-mar": {"Apoyo": "A-", "Moodys": "A-"}, "2023-sep": {"Apoyo": "A-", "JCR": "A", "Moodys": "A-"}, "2024-mar": {"Apoyo": "A-", "JCR": "A", "Moodys": "A-"}, "2024-sep": {"Apoyo": "A-", "JCR": "A", "Moodys": "A-"}, "2025-mar": {"Apoyo": "A-", "JCR": "A", "Moodys": "A-"}, "2025-sep": {"Apoyo": "A-", "JCR": "A", "Moodys": "A-"}, "2026-mar": {"Apoyo": "A", "JCR": "A", "Moodys": "A-"}}, "DEUTSCHE BANK PERU": {"2012-mar": {"Apoyo": "A", "Moodys": "A-"}, "2012-sep": {"Apoyo": "A", "Moodys": "A-"}, "2013-mar": {"Apoyo": "A", "Moodys": "A-"}, "2013-sep": {"Apoyo": "A", "Moodys": "A-"}, "2014-mar": {"Apoyo": "A+", "Moodys": "A"}, "2014-sep": {"Apoyo": "A+", "Moodys": "A"}, "2015-mar": {"Apoyo": "A+", "Moodys": "A"}, "2015-sep": {"Apoyo": "A+", "Moodys": "A"}, "2016-mar": {"Apoyo": "A+", "Moodys": "A-"}}, "INTERBANK": {"2012-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2012-sep": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2013-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2013-sep": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2014-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2014-sep": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2015-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2015-sep": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2016-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2016-sep": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2017-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2017-sep": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2018-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2018-sep": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2019-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A"}, "2019-sep": {"Apoyo": "A", "Class": "A+", "Moodys": "A+"}, "2020-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A+"}, "2020-sep": {"Apoyo": "A", "Class": "A+", "Moodys": "A+"}, "2021-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A+"}, "2021-sep": {"Apoyo": "A", "Class": "A+", "Moodys": "A+"}, "2022-mar": {"Apoyo": "A", "Class": "A+", "Moodys": "A+"}, "2022-sep": {"Apoyo": "A", "Moodys": "A+"}, "2023-mar": {"Apoyo": "A", "Moodys": "A+"}, "2023-sep": {"Apoyo": "A", "Moodys": "A+"}, "2024-mar": {"Apoyo": "A", "Moodys": "A+"}, "2024-sep": {"Apoyo": "A", "Moodys": "A+"}, "2025-mar": {"Apoyo": "A", "Moodys": "A+"}, "2025-sep": {"Apoyo": "A", "Moodys": "A+"}, "2026-mar": {"Apoyo": "A+", "Moodys": "A+"}}, "MIBANCO": {"2012-mar": {"Class": "A", "PCR": "A"}, "2012-sep": {"Class": "A", "PCR": "A"}, "2013-mar": {"Class": "A", "PCR": "A"}, "2013-sep": {"Class": "A", "PCR": "A"}, "2014-mar": {"Class": "A", "PCR": "A-"}, "2014-sep": {"Class": "A", "PCR": "A-"}, "2015-mar": {"Class": "A", "Moodys": "A", "PCR": "A"}, "2015-sep": {"Apoyo": "A", "Moodys": "A"}, "2016-mar": {"Apoyo": "A", "Moodys": "A"}, "2016-sep": {"Apoyo": "A", "Moodys": "A"}, "2017-mar": {"Apoyo": "A", "Moodys": "A"}, "2017-sep": {"Apoyo": "A", "Moodys": "A"}, "2018-mar": {"Apoyo": "A", "Moodys": "A"}, "2018-sep": {"Apoyo": "A", "Moodys": "A"}, "2019-mar": {"Apoyo": "A", "Moodys": "A"}, "2019-sep": {"Apoyo": "A", "Moodys": "A"}, "2020-mar": {"Apoyo": "A", "Moodys": "A"}, "2020-sep": {"Apoyo": "A", "Moodys": "A"}, "2021-mar": {"Apoyo": "A", "Moodys": "A"}, "2021-sep": {"Apoyo": "A", "Moodys": "A"}, "2022-mar": {"Apoyo": "A", "Moodys": "A"}, "2022-sep": {"Apoyo": "A", "Moodys": "A"}, "2023-mar": {"Apoyo": "A", "Moodys": "A"}, "2023-sep": {"Apoyo": "A", "Moodys": "A"}, "2024-mar": {"Apoyo": "A", "Moodys": "A"}, "2024-sep": {"Apoyo": "A", "Moodys": "A"}, "2025-mar": {"Apoyo": "A", "Moodys": "A"}, "2025-sep": {"Apoyo": "A", "Moodys": "A"}, "2026-mar": {"Apoyo": "A", "Moodys": "A"}}, "NACION": {"2012-mar": {"Apoyo": "A", "Moodys": "A"}, "2012-sep": {"Apoyo": "A", "Moodys": "A"}, "2013-mar": {"Apoyo": "A", "Moodys": "A"}, "2013-sep": {"Apoyo": "A", "Moodys": "A"}, "2014-mar": {"Apoyo": "A", "Moodys": "A"}, "2014-sep": {"Apoyo": "A", "Moodys": "A"}, "2015-mar": {"Apoyo": "A", "Moodys": "A"}, "2015-sep": {"Apoyo": "A", "Moodys": "A"}, "2016-mar": {"Moodys": "A"}, "2016-sep": {"Apoyo": "A", "Moodys": "A"}, "2017-mar": {"Moodys": "A"}, "2017-sep": {"Apoyo": "A", "Moodys": "A"}, "2018-mar": {"Apoyo": "A", "Moodys": "A"}, "2018-sep": {"Apoyo": "A", "Moodys": "A"}, "2019-mar": {"Apoyo": "A", "Moodys": "A"}, "2019-sep": {"Apoyo": "A", "Moodys": "A"}, "2020-mar": {"Apoyo": "A", "Moodys": "A"}, "2020-sep": {"Apoyo": "A", "Moodys": "A"}, "2021-mar": {"Apoyo": "A", "Class": "A", "Moodys": "A"}, "2021-sep": {"Apoyo": "A", "Class": "A"}, "2022-mar": {"Apoyo": "A", "Class": "A"}, "2022-sep": {"Apoyo": "A", "Class": "A"}, "2023-mar": {"Apoyo": "A", "Moodys": "A"}, "2023-sep": {"Apoyo": "A", "Moodys": "A"}, "2024-mar": {"Apoyo": "A", "Moodys": "A"}, "2024-sep": {"Apoyo": "A", "Moodys": "A"}, "2025-mar": {"Apoyo": "A", "Moodys": "A"}, "2025-sep": {"Apoyo": "A", "Moodys": "A"}, "2026-mar": {"Apoyo": "A", "Moodys": "A"}}, "SANTANDER PERU": {"2012-mar": {"Moodys": "A", "PCR": "A"}, "2012-sep": {"Moodys": "A", "PCR": "A"}, "2013-mar": {"Moodys": "A", "PCR": "A"}, "2013-sep": {"Moodys": "A", "PCR": "A"}, "2014-mar": {"Moodys": "A", "PCR": "A"}, "2014-sep": {"Moodys": "A", "PCR": "A"}, "2015-mar": {"Moodys": "A", "PCR": "A"}, "2015-sep": {"Moodys": "A", "PCR": "A"}, "2016-mar": {"Moodys": "A", "PCR": "A"}, "2016-sep": {"Moodys": "A", "PCR": "A"}, "2017-mar": {"Moodys": "A", "PCR": "A"}, "2017-sep": {"Apoyo": "A+", "Moodys": "A", "PCR": "A"}, "2018-mar": {"Apoyo": "A+", "Moodys": "A", "PCR": "A+"}, "2018-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2019-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2019-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2020-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2020-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2021-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2021-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2022-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2022-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2023-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2023-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2024-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2024-sep": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2025-mar": {"Apoyo": "A+", "Moodys": "A+", "PCR": "A+"}, "2025-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2026-mar": {"Apoyo": "A+", "Moodys": "A+"}}, "SCOTIABANK PERU": {"2012-mar": {"Apoyo": "A+", "Class": "A+"}, "2012-sep": {"Apoyo": "A+", "Class": "A+"}, "2013-mar": {"Apoyo": "A+", "Class": "A+"}, "2013-sep": {"Apoyo": "A+", "Class": "A+"}, "2014-mar": {"Apoyo": "A+", "Class": "A+"}, "2014-sep": {"Apoyo": "A+", "Class": "A+"}, "2015-mar": {"Apoyo": "A+", "Class": "A+"}, "2015-sep": {"Apoyo": "A+", "Class": "A+"}, "2016-mar": {"Apoyo": "A+", "Class": "A+"}, "2016-sep": {"Apoyo": "A+", "Class": "A+"}, "2017-mar": {"Apoyo": "A+", "Class": "A+"}, "2017-sep": {"Apoyo": "A+", "Class": "A+"}, "2018-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2018-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2019-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2019-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2020-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2020-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2021-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2021-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2022-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2022-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2023-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2023-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2024-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2024-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2025-mar": {"Apoyo": "A+", "Moodys": "A+"}, "2025-sep": {"Apoyo": "A+", "Moodys": "A+"}, "2026-mar": {"Apoyo": "A+", "Moodys": "A+"}}, "AGROBANCO": {"2012-sep": {"Apoyo": "B+", "Moodys": "B+"}, "2013-mar": {"Apoyo": "B+", "Moodys": "B+"}, "2013-sep": {"Apoyo": "A-", "Moodys": "B+"}, "2014-mar": {"Apoyo": "A-", "Moodys": "A-"}, "2014-sep": {"Apoyo": "A-", "Moodys": "A-"}, "2015-mar": {"Apoyo": "A-", "Moodys": "A-"}, "2015-sep": {"Apoyo": "A-", "Moodys": "A-"}, "2016-mar": {"Apoyo": "A-", "Moodys": "A-"}, "2016-sep": {"Apoyo": "A-", "Moodys": "B+"}, "2017-mar": {"Apoyo": "A-", "Moodys": "B+"}, "2017-sep": {"Apoyo": "A-", "Moodys": "B"}, "2018-sep": {"Apoyo": "B"}, "2019-sep": {"Apoyo": "B"}, "2020-mar": {"Apoyo": "B"}, "2020-sep": {"Apoyo": "B"}, "2021-mar": {"Apoyo": "B"}, "2021-sep": {"Apoyo": "B"}, "2022-mar": {"Apoyo": "B"}, "2022-sep": {"Apoyo": "B"}, "2023-mar": {"Apoyo": "B", "Microrate": "B-"}, "2023-sep": {"Apoyo": "B"}, "2024-mar": {"Apoyo": "B"}, "2024-sep": {"Apoyo": "B+"}, "2025-mar": {"Apoyo": "B+"}, "2025-sep": {"Apoyo": "B+"}, "2026-mar": {"Apoyo": "B+"}}, "ICBC PERU BANK S.A.": {"2014-mar": {"Apoyo": "A", "Moodys": "A"}, "2014-sep": {"Apoyo": "A", "Moodys": "A"}, "2015-mar": {"Apoyo": "A", "Moodys": "A"}, "2015-sep": {"Apoyo": "A", "Moodys": "A"}, "2016-mar": {"Apoyo": "A", "Moodys": "A"}, "2016-sep": {"Apoyo": "A", "Moodys": "A"}, "2017-mar": {"Apoyo": "A", "Moodys": "A"}, "2017-sep": {"Apoyo": "A", "Moodys": "A"}, "2018-mar": {"Apoyo": "A", "Moodys": "A"}, "2018-sep": {"Moodys": "A", "PCR": "A"}, "2019-mar": {"Moodys": "A", "PCR": "A"}, "2019-sep": {"Moodys": "A", "PCR": "A"}, "2020-mar": {"Moodys": "A", "PCR": "A"}, "2020-sep": {"Moodys": "A", "PCR": "A"}, "2021-mar": {"Moodys": "A", "PCR": "A"}, "2021-sep": {"Moodys": "A", "PCR": "A"}, "2022-mar": {"Moodys": "A", "PCR": "A"}, "2022-sep": {"Moodys": "A", "PCR": "A"}, "2023-mar": {"Moodys": "A", "PCR": "A"}, "2023-sep": {"Moodys": "A", "PCR": "A"}, "2024-mar": {"Moodys": "A", "PCR": "A"}, "2024-sep": {"Moodys": "A", "PCR": "A"}, "2025-mar": {"Moodys": "A", "PCR": "A"}, "2025-sep": {"Moodys": "A", "PCR": "A"}, "2026-mar": {"Apoyo": "A+", "Moodys": "A", "PCR": "A"}}, "BANK OF CHINA (PERU)": {"2020-mar": {"Moodys": "A"}, "2020-sep": {"Class": "A", "Moodys": "A"}, "2021-mar": {"Class": "A", "Moodys": "A"}, "2021-sep": {"Class": "A", "Moodys": "A"}, "2022-mar": {"Class": "A", "Moodys": "A"}, "2022-sep": {"Moodys": "A", "PCR": "A"}, "2023-mar": {"Moodys": "A", "PCR": "A"}, "2023-sep": {"Moodys": "A", "PCR": "A"}, "2024-mar": {"Moodys": "A", "PCR": "A"}, "2024-sep": {"Moodys": "A", "PCR": "A"}, "2025-mar": {"Moodys": "A", "PCR": "A"}, "2025-sep": {"Moodys": "A", "PCR": "A"}, "2026-mar": {"Apoyo": "A+", "Moodys": "A", "PCR": "A"}}, "BANCO BCI": {"2022-sep": {"Apoyo": "A", "Class": "A"}, "2023-mar": {"Apoyo": "A", "Moodys": "A"}, "2023-sep": {"Apoyo": "A", "Moodys": "A"}, "2024-mar": {"Apoyo": "A", "Moodys": "A"}, "2024-sep": {"Apoyo": "A", "Moodys": "A"}, "2025-mar": {"Apoyo": "A", "Moodys": "A"}, "2025-sep": {"Apoyo": "A", "Moodys": "A"}, "2026-mar": {"Apoyo": "A", "Moodys": "A"}}};
+
+const AGENCY_LIST = ["Apoyo", "Class", "JCR", "Microrate", "Moodys", "PCR"];
+
+/* ------------------------------------------------------------
+   Bloque de datos REALES generado automáticamente por
+   scripts/actualizar_interfaz.py a partir de outputs/analisis,
+   outputs/interfaz y motor/datos/eventos_intervencion.py.
+   NO editar a mano: cualquier cambio se pierde en la próxima
+   ejecución del script. Ver README y scripts/actualizar_interfaz.py.
+   ------------------------------------------------------------ */
+/* DATA_START */
+const REAL_METRICAS_POR_ECR = {"APOYO": {"ganador": "4-LightGBM", "modelos": {"4-LightGBM": {"n": 27, "accuracy": 0.7037, "accuracy_pm1": 0.963, "f1_macro": 0.6348, "mae_ordinal": 0.3333, "weighted_kappa": 0.8617, "puntaje": 0.9862}, "1-HistGB": {"n": 27, "accuracy": 0.6667, "accuracy_pm1": 0.9259, "f1_macro": 0.6121, "mae_ordinal": 0.4074, "weighted_kappa": 0.8312, "puntaje": 0.8808}, "2-MLPOrdinal": {"n": 27, "accuracy": 0.5556, "accuracy_pm1": 0.8889, "f1_macro": 0.2861, "mae_ordinal": 0.7037, "weighted_kappa": 0.7668, "puntaje": 0.4485}, "3-RegresionOrdinal": {"n": 27, "accuracy": 0.4444, "accuracy_pm1": 0.7407, "f1_macro": 0.2232, "mae_ordinal": 1.0741, "weighted_kappa": 0.5771, "puntaje": 0.0}}}, "JCR": {"ganador": "1-HistGB", "modelos": {"1-HistGB": {"n": 11, "accuracy": 0.8182, "accuracy_pm1": 1.0, "f1_macro": 0.6939, "mae_ordinal": 0.1818, "weighted_kappa": 0.9214, "puntaje": 0.9862}, "4-LightGBM": {"n": 11, "accuracy": 0.8182, "accuracy_pm1": 0.9091, "f1_macro": 0.6653, "mae_ordinal": 0.5455, "weighted_kappa": 0.811, "puntaje": 0.2404}, "2-MLPOrdinal": {"n": 11, "accuracy": 0.7273, "accuracy_pm1": 0.9091, "f1_macro": 0.5833, "mae_ordinal": 0.4545, "weighted_kappa": 0.8029, "puntaje": 0.1815}, "3-RegresionOrdinal": {"n": 11, "accuracy": 0.6364, "accuracy_pm1": 0.9091, "f1_macro": 0.4762, "mae_ordinal": 0.4545, "weighted_kappa": 0.8136, "puntaje": 0.1018}}}, "MICRORATE": {"ganador": "4-LightGBM", "modelos": {"4-LightGBM": {"n": 4, "accuracy": 1.0, "accuracy_pm1": 1.0, "f1_macro": 1.0, "mae_ordinal": 0.0, "weighted_kappa": 1.0, "puntaje": 0.9862}, "1-HistGB": {"n": 4, "accuracy": 0.75, "accuracy_pm1": 1.0, "f1_macro": 0.6, "mae_ordinal": 0.25, "weighted_kappa": 0.8571, "puntaje": 0.7485}, "2-MLPOrdinal": {"n": 4, "accuracy": 0.5, "accuracy_pm1": 1.0, "f1_macro": 0.3333, "mae_ordinal": 0.5, "weighted_kappa": 0.75, "puntaje": 0.5852}, "3-RegresionOrdinal": {"n": 4, "accuracy": 0.0, "accuracy_pm1": 0.5, "f1_macro": 0.0, "mae_ordinal": 3.0, "weighted_kappa": -0.0588, "puntaje": 0.0}}}, "MOODYS": {"ganador": "1-HistGB", "modelos": {"1-HistGB": {"n": 30, "accuracy": 0.9667, "accuracy_pm1": 1.0, "f1_macro": 0.9748, "mae_ordinal": 0.0333, "weighted_kappa": 0.984, "puntaje": 0.9862}, "4-LightGBM": {"n": 30, "accuracy": 0.9667, "accuracy_pm1": 1.0, "f1_macro": 0.9748, "mae_ordinal": 0.0333, "weighted_kappa": 0.984, "puntaje": 0.9862}, "2-MLPOrdinal": {"n": 30, "accuracy": 0.6333, "accuracy_pm1": 1.0, "f1_macro": 0.6833, "mae_ordinal": 0.3667, "weighted_kappa": 0.8348, "puntaje": 0.6506}, "3-RegresionOrdinal": {"n": 30, "accuracy": 0.5, "accuracy_pm1": 0.5, "f1_macro": 0.4505, "mae_ordinal": 1.8667, "weighted_kappa": 0.2067, "puntaje": 0.0}}}, "PCR": {"ganador": "1-HistGB", "modelos": {"1-HistGB": {"n": 16, "accuracy": 0.8125, "accuracy_pm1": 1.0, "f1_macro": 0.5759, "mae_ordinal": 0.1875, "weighted_kappa": 0.9024, "puntaje": 0.9862}, "4-LightGBM": {"n": 16, "accuracy": 0.8125, "accuracy_pm1": 1.0, "f1_macro": 0.5759, "mae_ordinal": 0.1875, "weighted_kappa": 0.9024, "puntaje": 0.9862}, "2-MLPOrdinal": {"n": 16, "accuracy": 0.75, "accuracy_pm1": 0.9375, "f1_macro": 0.4509, "mae_ordinal": 0.3125, "weighted_kappa": 0.8735, "puntaje": 0.667}, "3-RegresionOrdinal": {"n": 16, "accuracy": 0.625, "accuracy_pm1": 0.6875, "f1_macro": 0.4082, "mae_ordinal": 0.75, "weighted_kappa": 0.6379, "puntaje": 0.0}}}};
+const REAL_GANADOR_POR_ECR = {"APOYO": "4-LightGBM", "JCR": "1-HistGB", "MICRORATE": "4-LightGBM", "MOODYS": "1-HistGB", "PCR": "1-HistGB"};
+const REAL_RESUMEN_MODELOS = {"1-HistGB": {"label": "HistGradientBoosting", "puntaje_promedio": 0.9176, "n_ecr": 5}, "2-MLPOrdinal": {"label": "MLP Ordinal Multi-task", "puntaje_promedio": 0.5066, "n_ecr": 5}, "3-RegresionOrdinal": {"label": "Regresión Logística Ordinal", "puntaje_promedio": 0.0204, "n_ecr": 5}, "4-LightGBM": {"label": "LightGBM", "puntaje_promedio": 0.837, "n_ecr": 5}};
+const REAL_ECRS_CON_METRICAS = ["APOYO", "JCR", "MICRORATE", "MOODYS", "PCR"];
+const REAL_ECRS_SIN_METRICAS = ["CLASS"];
+const REAL_PREDICCIONES_SEP2026 = [{"ENTITY_NAME": "BANK OF CHINA (PERU)", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "BANK OF CHINA (PERU)", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "BANK OF CHINA (PERU)", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "BANK OF CHINA (PERU)", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "BCI Perú", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "BCI Perú", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "BCI Perú", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Alfin", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "C+", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Alfin", "ENTITY_TYPE": "BANCO", "ECR": "JCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Alfin", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "C-", "RATING_PREDICHO": "C-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Alfin", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Continental", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Continental", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Continental", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Falabella", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Falabella", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Falabella", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco GNB", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco GNB", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco GNB", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco ICBC", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco ICBC", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco ICBC", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Interamericano de Finanzas", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Interamericano de Finanzas", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Interamericano de Finanzas", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Pichincha", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Pichincha", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Pichincha", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Pichincha", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Ripley", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Ripley", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Ripley", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Ripley", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Santander", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Santander", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco Santander", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco de Comercio", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco de Comercio", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco de Crédito", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco de Crédito", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Banco de Crédito", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Citibank", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Citibank", "ENTITY_TYPE": "BANCO", "ECR": "PCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Compartamos Banco", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Compartamos Banco", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Compartamos Banco", "ENTITY_TYPE": "BANCO", "ECR": "JCR", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Compartamos Banco", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Interbank", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Interbank", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Interbank", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Mibanco", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Mibanco", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Santander Consumer Bank S.A", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Santander Consumer Bank S.A", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Santander Consumer Bank S.A", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Scotiabank", "ENTITY_TYPE": "BANCO", "ECR": "APOYO", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Scotiabank", "ENTITY_TYPE": "BANCO", "ECR": "CLASS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Scotiabank", "ENTITY_TYPE": "BANCO", "ECR": "MOODYS", "FECHA_BASE": "2026-05-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 4, "RATING_ANTERIOR": "A+", "RATING_PREDICHO": "A+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Arequipa", "ENTITY_TYPE": "CMAC", "ECR": "APOYO", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Arequipa", "ENTITY_TYPE": "CMAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Arequipa", "ENTITY_TYPE": "CMAC", "ECR": "JCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Arequipa", "ENTITY_TYPE": "CMAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Arequipa", "ENTITY_TYPE": "CMAC", "ECR": "PCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Cusco", "ENTITY_TYPE": "CMAC", "ECR": "APOYO", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Cusco", "ENTITY_TYPE": "CMAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Cusco", "ENTITY_TYPE": "CMAC", "ECR": "JCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Cusco", "ENTITY_TYPE": "CMAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Cusco", "ENTITY_TYPE": "CMAC", "ECR": "PCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Del Santa", "ENTITY_TYPE": "CMAC", "ECR": "APOYO", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C-", "RATING_PREDICHO": "C-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Del Santa", "ENTITY_TYPE": "CMAC", "ECR": "MICRORATE", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "D+", "RATING_PREDICHO": "D+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Huancayo", "ENTITY_TYPE": "CMAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Huancayo", "ENTITY_TYPE": "CMAC", "ECR": "JCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Huancayo", "ENTITY_TYPE": "CMAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Huancayo", "ENTITY_TYPE": "CMAC", "ECR": "PCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Ica", "ENTITY_TYPE": "CMAC", "ECR": "APOYO", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B-", "RATING_PREDICHO": "B-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Ica", "ENTITY_TYPE": "CMAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B-", "RATING_PREDICHO": "C+", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Ica", "ENTITY_TYPE": "CMAC", "ECR": "JCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Ica", "ENTITY_TYPE": "CMAC", "ECR": "MICRORATE", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C+", "RATING_PREDICHO": "C+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Ica", "ENTITY_TYPE": "CMAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B-", "RATING_PREDICHO": "B-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Ica", "ENTITY_TYPE": "CMAC", "ECR": "PCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Maynas", "ENTITY_TYPE": "CMAC", "ECR": "APOYO", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B-", "RATING_PREDICHO": "B-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Maynas", "ENTITY_TYPE": "CMAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B-", "RATING_PREDICHO": "C+", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Maynas", "ENTITY_TYPE": "CMAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B-", "RATING_PREDICHO": "B-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Maynas", "ENTITY_TYPE": "CMAC", "ECR": "PCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C+", "RATING_PREDICHO": "C+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Paita", "ENTITY_TYPE": "CMAC", "ECR": "APOYO", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Paita", "ENTITY_TYPE": "CMAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "D+", "RATING_PREDICHO": "D", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Paita", "ENTITY_TYPE": "CMAC", "ECR": "MICRORATE", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Paita", "ENTITY_TYPE": "CMAC", "ECR": "PCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "D", "RATING_PREDICHO": "D", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Piura", "ENTITY_TYPE": "CMAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B", "RATING_PREDICHO": "B-", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Piura", "ENTITY_TYPE": "CMAC", "ECR": "MICRORATE", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B", "RATING_PREDICHO": "B", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Piura", "ENTITY_TYPE": "CMAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B", "RATING_PREDICHO": "B", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Tacna", "ENTITY_TYPE": "CMAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C-", "RATING_PREDICHO": "D+", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Tacna", "ENTITY_TYPE": "CMAC", "ECR": "JCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Tacna", "ENTITY_TYPE": "CMAC", "ECR": "MICRORATE", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C-", "RATING_PREDICHO": "C-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Tacna", "ENTITY_TYPE": "CMAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Trujillo", "ENTITY_TYPE": "CMAC", "ECR": "APOYO", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Trujillo", "ENTITY_TYPE": "CMAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B", "RATING_PREDICHO": "B-", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CMAC Trujillo", "ENTITY_TYPE": "CMAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC CENCOSUD SCOTIA", "ENTITY_TYPE": "CRAC", "ECR": "APOYO", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC CENCOSUD SCOTIA", "ENTITY_TYPE": "CRAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC DEL CENTRO", "ENTITY_TYPE": "CRAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C-", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC DEL CENTRO", "ENTITY_TYPE": "CRAC", "ECR": "JCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "D+", "RATING_PREDICHO": "D+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC DEL CENTRO", "ENTITY_TYPE": "CRAC", "ECR": "MICRORATE", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C-", "RATING_PREDICHO": "C-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC DEL CENTRO", "ENTITY_TYPE": "CRAC", "ECR": "PCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "D", "RATING_PREDICHO": "E", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC INCASUR", "ENTITY_TYPE": "CRAC", "ECR": "APOYO", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C-", "RATING_PREDICHO": "C-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC INCASUR", "ENTITY_TYPE": "CRAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C-", "RATING_PREDICHO": "D+", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC INCASUR", "ENTITY_TYPE": "CRAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C-", "RATING_PREDICHO": "C-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC LOS ANDES", "ENTITY_TYPE": "CRAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B-", "RATING_PREDICHO": "C+", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC LOS ANDES", "ENTITY_TYPE": "CRAC", "ECR": "JCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B-", "RATING_PREDICHO": "B-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC LOS ANDES", "ENTITY_TYPE": "CRAC", "ECR": "MICRORATE", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C+", "RATING_PREDICHO": "C+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC LOS ANDES", "ENTITY_TYPE": "CRAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "B-", "RATING_PREDICHO": "B-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC LOS ANDES", "ENTITY_TYPE": "CRAC", "ECR": "PCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C+", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC PRYMERA", "ENTITY_TYPE": "CRAC", "ECR": "APOYO", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC PRYMERA", "ENTITY_TYPE": "CRAC", "ECR": "CLASS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C-", "RATING_PREDICHO": "D+", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC PRYMERA", "ENTITY_TYPE": "CRAC", "ECR": "JCR", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "CRAC PRYMERA", "ENTITY_TYPE": "CRAC", "ECR": "MOODYS", "FECHA_BASE": "2026-03-31", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 6, "RATING_ANTERIOR": "C-", "RATING_PREDICHO": "C-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Confianza", "ENTITY_TYPE": "FINANCIERA", "ECR": "APOYO", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Confianza", "ENTITY_TYPE": "FINANCIERA", "ECR": "CLASS", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Confianza", "ENTITY_TYPE": "FINANCIERA", "ECR": "MOODYS", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Efectiva", "ENTITY_TYPE": "FINANCIERA", "ECR": "APOYO", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "B+", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Efectiva", "ENTITY_TYPE": "FINANCIERA", "ECR": "CLASS", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "B+", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Efectiva", "ENTITY_TYPE": "FINANCIERA", "ECR": "JCR", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Efectiva", "ENTITY_TYPE": "FINANCIERA", "ECR": "MOODYS", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Efectiva", "ENTITY_TYPE": "FINANCIERA", "ECR": "PCR", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Proempresa", "ENTITY_TYPE": "FINANCIERA", "ECR": "APOYO", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Proempresa", "ENTITY_TYPE": "FINANCIERA", "ECR": "CLASS", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "B-", "RATING_PREDICHO": "C+", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Proempresa", "ENTITY_TYPE": "FINANCIERA", "ECR": "MOODYS", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Qapaq", "ENTITY_TYPE": "FINANCIERA", "ECR": "APOYO", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "C+", "RATING_PREDICHO": "C+", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Qapaq", "ENTITY_TYPE": "FINANCIERA", "ECR": "CLASS", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "C+", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Qapaq", "ENTITY_TYPE": "FINANCIERA", "ECR": "MOODYS", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Qapaq", "ENTITY_TYPE": "FINANCIERA", "ECR": "PCR", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "C", "RATING_PREDICHO": "C-", "CAMBIO_ORDINAL": 1, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Surgir", "ENTITY_TYPE": "FINANCIERA", "ECR": "APOYO", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Surgir", "ENTITY_TYPE": "FINANCIERA", "ECR": "MOODYS", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Financiera Surgir", "ENTITY_TYPE": "FINANCIERA", "ECR": "PCR", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Mitsui Auto Finance", "ENTITY_TYPE": "FINANCIERA", "ECR": "APOYO", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A", "RATING_PREDICHO": "A", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}, {"ENTITY_NAME": "Mitsui Auto Finance", "ENTITY_TYPE": "FINANCIERA", "ECR": "MOODYS", "FECHA_BASE": "2026-04-30", "FECHA_TARGET": "2026-09-30", "GAP_MESES": 5, "RATING_ANTERIOR": "A-", "RATING_PREDICHO": "A-", "CAMBIO_ORDINAL": 0, "ALERTA_DOWNGRADE_FUERTE": false, "ALERTA_INTERVENCION_HISTORICA": false}];
+const REAL_ENTIDADES_EXCLUIDAS = [{"ENTITY_NAME": "Deutsche Bank Perú", "FECHA_TARGET": "2026-09-30", "MOTIVO": "Entidad con evento de intervencion SBS confirmado antes o durante la ventana de prediccion"}, {"ENTITY_NAME": "CMAC Sullana", "FECHA_TARGET": "2026-09-30", "MOTIVO": "Entidad con evento de intervencion SBS confirmado antes o durante la ventana de prediccion"}, {"ENTITY_NAME": "CRAC Cajamarca", "FECHA_TARGET": "2026-09-30", "MOTIVO": "Entidad con evento de intervencion SBS confirmado antes o durante la ventana de prediccion"}, {"ENTITY_NAME": "CRAC RAIZ", "FECHA_TARGET": "2026-09-30", "MOTIVO": "Entidad con evento de intervencion SBS confirmado antes o durante la ventana de prediccion"}, {"ENTITY_NAME": "CRAC Sipán", "FECHA_TARGET": "2026-09-30", "MOTIVO": "Entidad con evento de intervencion SBS confirmado antes o durante la ventana de prediccion"}, {"ENTITY_NAME": "Amérika Financiera", "FECHA_TARGET": "2026-09-30", "MOTIVO": "Entidad con evento de intervencion SBS confirmado antes o durante la ventana de prediccion"}, {"ENTITY_NAME": "Financiera Credinka", "FECHA_TARGET": "2026-09-30", "MOTIVO": "Entidad con evento de intervencion SBS confirmado antes o durante la ventana de prediccion"}, {"ENTITY_NAME": "Financiera TFC S.A.", "FECHA_TARGET": "2026-09-30", "MOTIVO": "Entidad con evento de intervencion SBS confirmado antes o durante la ventana de prediccion"}];
+const REAL_EVENTOS_INTERVENCION = [{"ENTITY_NAME_NORM": "CRAC RAIZ", "TIPO_ENTIDAD": "CRAC", "FECHA_EVENTO": "2023-08-10", "TIPO_EVENTO": "INTERVENCION_Y_LIQUIDACION", "RESOLUCION_SBS": "Res. SBS N.° 2646-2023 (intervencion) / N.° 2672-2023 (disolucion)", "DESCRIPCION": "Intervenida por deterioro acelerado de solvencia; disuelta y en liquidacion.", "FUENTE": "El Peruano, 11-ago-2023; SBS FAQ CRAC Raiz.", "historial": [{"corte": "MAR2016", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}}]}, {"ENTITY_NAME_NORM": "AMERIKA FINANCIERA", "TIPO_ENTIDAD": "FINANCIERA", "FECHA_EVENTO": "2022-08-26", "TIPO_EVENTO": "DISOLUCION_VOLUNTARIA", "RESOLUCION_SBS": "Acuerdo de Junta General de Accionistas (sujeto a autorizacion SBS conforme Res. SBS N.° 455-99)", "DESCRIPCION": "Fallo el proyecto de fusion con Banco Pichincha; accionistas aprobaron disolucion y liquidacion.", "FUENTE": "Revista Gan@Más, ago-2022.", "historial": [{"corte": "MAR2016", "CLASS": {"rating": "B+", "ordinal": 3, "valido": true}, "MOODYS": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "MAR2017", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}, "MOODYS": {"rating": "C+", "ordinal": 6, "valido": true}}, {"corte": "MAR2018", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}, "MOODYS": {"rating": "C+", "ordinal": 6, "valido": true}}, {"corte": "MAR2019", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "MAR2020", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "MAR2021", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "MAR2022", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "SEP2016", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}, "MOODYS": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "SEP2017", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}, "MOODYS": {"rating": "C+", "ordinal": 6, "valido": true}}, {"corte": "SEP2018", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "SEP2019", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "SEP2020", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "SEP2021", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "SEP2025", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}}]}, {"ENTITY_NAME_NORM": "CMAC SULLANA", "TIPO_ENTIDAD": "CMAC", "FECHA_EVENTO": "2024-07-11", "TIPO_EVENTO": "INTERVENCION_Y_LIQUIDACION", "RESOLUCION_SBS": "Res. SBS N.° 2477-2024 (intervencion) / N.° 2497-2024 (disolucion)", "DESCRIPCION": "Intervenida por deterioro acelerado de solvencia (patrimonio); cartera transferida a CMAC Piura.", "FUENTE": "El Peruano, 15-jul-2024; Infobae, 14-jul-2024.", "historial": [{"corte": "MAR2016", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}, "MICRORATE": {"rating": "B-", "ordinal": 5, "valido": true}, "MOODYS": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "MAR2017", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}, "MICRORATE": {"rating": "B-", "ordinal": 5, "valido": true}, "MOODYS": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "MAR2018", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "MICRORATE": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "MAR2019", "CLASS": {"rating": "C+", "ordinal": 6, "valido": true}, "MICRORATE": {"rating": "C+", "ordinal": 6, "valido": true}}, {"corte": "MAR2020", "CLASS": {"rating": "C+", "ordinal": 6, "valido": true}, "MICRORATE": {"rating": "C", "ordinal": 7, "valido": true}}, {"corte": "MAR2021", "CLASS": {"rating": "C", "ordinal": 7, "valido": true}, "MICRORATE": {"rating": "C-", "ordinal": 8, "valido": true}}, {"corte": "MAR2022", "CLASS": {"rating": "C-", "ordinal": 8, "valido": true}, "MICRORATE": {"rating": "C-", "ordinal": 8, "valido": true}}, {"corte": "MAR2023", "MICRORATE": {"rating": "C-", "ordinal": 8, "valido": true}, "MOODYS": {"rating": "C", "ordinal": 7, "valido": true}}, {"corte": "SEP2016", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}, "MICRORATE": {"rating": "B-", "ordinal": 5, "valido": true}, "MOODYS": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "SEP2017", "CLASS": {"rating": "B", "ordinal": 4, "valido": true}, "MICRORATE": {"rating": "B-", "ordinal": 5, "valido": true}, "MOODYS": {"rating": "C+", "ordinal": 6, "valido": true}}, {"corte": "SEP2018", "CLASS": {"rating": "C+", "ordinal": 6, "valido": true}, "MICRORATE": {"rating": "C+", "ordinal": 6, "valido": true}}, {"corte": "SEP2019", "CLASS": {"rating": "C+", "ordinal": 6, "valido": true}, "MICRORATE": {"rating": "C+", "ordinal": 6, "valido": true}}, {"corte": "SEP2020", "CLASS": {"rating": "C", "ordinal": 7, "valido": true}, "MICRORATE": {"rating": "C", "ordinal": 7, "valido": true}}, {"corte": "SEP2021", "CLASS": {"rating": "C-", "ordinal": 8, "valido": true}, "MICRORATE": {"rating": "C-", "ordinal": 8, "valido": true}}, {"corte": "SEP2022", "MICRORATE": {"rating": "C-", "ordinal": 8, "valido": true}, "MOODYS": {"rating": "C", "ordinal": 7, "valido": true}}, {"corte": "SEP2023", "MICRORATE": {"rating": "D+", "ordinal": 9, "valido": true}, "MOODYS": {"rating": "RET", "ordinal": null, "valido": false}}, {"corte": "SEP2025", "CLASS": {"rating": "C-", "ordinal": 8, "valido": true}, "MICRORATE": {"rating": "D+", "ordinal": 9, "valido": true}}]}, {"ENTITY_NAME_NORM": "FINANCIERA CREDINKA", "TIPO_ENTIDAD": "FINANCIERA", "FECHA_EVENTO": "2024-09-19", "TIPO_EVENTO": "INTERVENCION", "RESOLUCION_SBS": "Res. SBS N.° 3341-2024", "DESCRIPCION": "Intervenida por acelerado deterioro de solvencia (reduccion de patrimonio de 59.53% en 12 meses); cartera transferida via concurso por invitacion.", "FUENTE": "Gestion, 19-sep-2024; El Comercio, 19-sep-2024.", "historial": [{"corte": "MAR2016", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "MOODYS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "MAR2017", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "MAR2018", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "MAR2019", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "MAR2020", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "MAR2021", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "MAR2022", "CLASS": {"rating": "C", "ordinal": 7, "valido": true}, "PCR": {"rating": "C+", "ordinal": 6, "valido": true}}, {"corte": "MAR2023", "MOODYS": {"rating": "C-", "ordinal": 8, "valido": true}, "PCR": {"rating": "C", "ordinal": 7, "valido": true}}, {"corte": "MAR2024", "MOODYS": {"rating": "RET", "ordinal": null, "valido": false}, "PCR": {"rating": "E", "ordinal": 12, "valido": true}}, {"corte": "SEP2016", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "SEP2017", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "SEP2018", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "SEP2019", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "SEP2020", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B", "ordinal": 4, "valido": true}}, {"corte": "SEP2021", "CLASS": {"rating": "B-", "ordinal": 5, "valido": true}, "PCR": {"rating": "B-", "ordinal": 5, "valido": true}}, {"corte": "SEP2022", "MOODYS": {"rating": "C", "ordinal": 7, "valido": true}, "PCR": {"rating": "C+", "ordinal": 6, "valido": true}}, {"corte": "SEP2023", "MOODYS": {"rating": "C-", "ordinal": 8, "valido": true}, "PCR": {"rating": "C", "ordinal": 7, "valido": true}}, {"corte": "SEP2025", "CLASS": {"rating": "C+", "ordinal": 6, "valido": true}, "PCR": {"rating": "B-", "ordinal": 5, "valido": true}}]}, {"ENTITY_NAME_NORM": "DEUTSCHE BANK PERU", "TIPO_ENTIDAD": "BANCO", "FECHA_EVENTO": "2016-06-12", "TIPO_EVENTO": "DISOLUCION_VOLUNTARIA", "RESOLUCION_SBS": "Res. SBS N.° 3722-2016 (disolucion voluntaria y liquidacion)", "DESCRIPCION": "Deutsche Bank anuncio en oct-2015 el retiro de sus operaciones de banca en 10 paises (incluido Peru); la SBS autorizo la disolucion voluntaria y liquidacion de la subsidiaria local. No operaba banca minorista: intermediacion corporativa, trading de renta fija/moneda extranjera y derivados.", "FUENTE": "El Peruano, Res. SBS N.° 3722-2016; Semana Economica, jul-2016.", "historial": []}, {"ENTITY_NAME_NORM": "CRAC SIPAN", "TIPO_ENTIDAD": "CRAC", "FECHA_EVENTO": "2021-09-28", "TIPO_EVENTO": "DISOLUCION_VOLUNTARIA", "RESOLUCION_SBS": "Res. SBS N.° 2844-2021", "DESCRIPCION": "Disolucion voluntaria y liquidacion ordenada, aprobada por la SBS tras deterioro financiero agravado por la pandemia (morosidad de 87.04% a jul-2021). A diferencia de una intervencion forzosa, la entidad demostro capacidad de devolver el integro de los depositos (no se uso el Fondo de Seguro de Depositos).", "FUENTE": "RPP, 28-sep-2021; Caretas, sep-2021; Infomercado, 13-oct-2021.", "historial": []}, {"ENTITY_NAME_NORM": "FINANCIERA TFC S.A.", "TIPO_ENTIDAD": "FINANCIERA", "FECHA_EVENTO": "2019-12-12", "TIPO_EVENTO": "INTERVENCION_Y_LIQUIDACION", "RESOLUCION_SBS": "Res. SBS N.° 5826-2019 (intervencion) / N.° 5855-2019 (disolucion), ambas notificadas 12-dic-2019", "DESCRIPCION": "Intervenida por reduccion de mas del 50% de su patrimonio efectivo en 12 meses; dispuesta su disolucion y liquidacion. El proceso fue objeto de una medida cautelar judicial (jul-2020 a abr-2022) que suspendio temporalmente la liquidacion sin revertir el Regimen de Intervencion; la entidad nunca volvio a operar con normalidad.", "FUENTE": "Gestion, 12-dic-2019; El Peruano Res. SBS N.° 5826-2019/5855-2019; tfc.com.pe/situacion-juridica.", "historial": []}, {"ENTITY_NAME_NORM": "CRAC CAJAMARCA", "TIPO_ENTIDAD": "CRAC", "FECHA_EVENTO": "2016-07-27", "TIPO_EVENTO": "FUSION_POR_ABSORCION", "RESOLUCION_SBS": "Res. SBS N.° 4169-2016 (27-jul-2016)", "DESCRIPCION": "NO es un fracaso ni una liquidacion: Financiera Credinka S.A. absorbe a CRAC Cajamarca por fusion (acordada mar-2016, autorizada por la SBS jul-2016). CRAC Cajamarca se extingue como entidad juridica y como serie financiera independiente; su cartera y clientes pasan a Financiera Credinka. Se excluye de la proyeccion futura porque, como entidad separada, deja de existir desde esa fecha (no porque haya quebrado).", "FUENTE": "Gestion, 02-ago-2016; Semana Economica, ago-2016; El Peruano Res. SBS N.° 4169-2016; SMV - Fundamento clasificacion Financiera Credinka jun-2017.", "historial": []}];
+const REAL_CORTE_OBJETIVO = "SEP2026";
+const REAL_MODELOS_LABEL = {"1-HistGB": "HistGradientBoosting", "2-MLPOrdinal": "MLP Ordinal Multi-task", "3-RegresionOrdinal": "Regresión Logística Ordinal", "4-LightGBM": "LightGBM"};
+const REAL_ACTUALIZADO_EN = "2026-09-14 23:14";
+/* DATA_END */
+
+function ratingTone(r) {
+  if (!r) return { bg: C.chipBg, fg: C.slateSoft };
+  if (r.startsWith("AAA") || r.startsWith("AA")) return { bg: C.emeraldSoft, fg: C.emerald };
+  if (r.startsWith("BBB")) return { bg: C.amberSoft, fg: C.amber };
+  if (r.startsWith("BB")) return { bg: C.amberSoft, fg: "#9A5A12" };
+  if (r.startsWith("A")) return { bg: C.emeraldSoft, fg: "#1F7A50" };
+  if (r.startsWith("B")) return { bg: C.crimsonSoft, fg: C.crimson };
+  return { bg: C.crimsonSoft, fg: C.crimson };
+}
+
+/* ============================================================
+   2. GENERACION DE DATOS SIMULADOS (realistas / no oficiales)
+   ============================================================ */
+function hash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return (h % 1000) / 1000;
+}
+
+const BASE = {
+  banco: { morosidad: 4.1, roe: 17.5, roa: 2.1, capital: 14.6, credBase: 32000, tamMult: 1 },
+  cmac: { morosidad: 6.6, roe: 11.5, roa: 1.8, capital: 15.6, credBase: 3400, tamMult: 1 },
+  crac: { morosidad: 11.2, roe: 4.2, roa: 0.6, capital: 17.4, credBase: 340, tamMult: 1 },
+  financiera: { morosidad: 7.4, roe: 9.4, roa: 1.3, capital: 16.1, credBase: 1500, tamMult: 1 },
+};
+
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function buildEntitySeries(name, tipo, idxInGroup) {
+  const b = BASE[tipo];
+  const seedBase = hash(name);
+  const sizeFactor = 0.45 + hash(name + "size") * 1.6; // dispersión de tamaño entre entidades
+  return YEARS.map((year) => {
+    const t = year - 2015;
+    const covid = year === 2020 ? 1 : year === 2021 ? 0.45 : 0;
+    const stress24 = year === 2024 ? 1 : year === 2023 ? 0.3 : year === 2025 ? 0.35 : 0;
+    const seed = hash(name + year) - 0.5;
+
+    let morosidad = b.morosidad + covid * 2.6 + stress24 * 1.3 + seed * 1.6 - t * 0.035;
+    morosidad = clamp(morosidad, 0.9, tipo === "crac" ? 22 : 14);
+
+    let roe = b.roe - covid * 9 - stress24 * 5.5 + seed * 5 + t * 0.15;
+    if (tipo === "crac") roe -= 2; // más volátil / a veces negativo
+    roe = clamp(roe, tipo === "crac" ? -12 : -4, 28);
+
+    let roa = b.roa - covid * 1.1 - stress24 * 0.6 + seed * 0.6 + t * 0.01;
+    roa = clamp(roa, tipo === "crac" ? -1.8 : -0.6, 4.5);
+
+    let capital = b.capital + seed * 1.2 - covid * 0.3 + t * 0.02;
+    capital = clamp(capital, 11, 24);
+
+    const growth = Math.pow(1.058 + seed * 0.02, t); // crecimiento nominal de cartera
+    const creditos = Math.round(b.credBase * sizeFactor * growth * (1 - covid * 0.04));
+    const depositos = Math.round(creditos * (0.85 + hash(name + "dep") * 0.35));
+
+    return { year, morosidad: +morosidad.toFixed(2), roe: +roe.toFixed(2), roa: +roa.toFixed(2), capital: +capital.toFixed(2), creditos, depositos };
+  });
+}
+
+function useSystemData() {
+  return useMemo(() => {
+    const data = {};
+    Object.entries(ENTIDADES).forEach(([tipo, names]) => {
+      data[tipo] = {};
+      names.forEach((n, i) => {
+        data[tipo][n] = buildEntitySeries(n, tipo, i);
+      });
+    });
+    return data;
+  }, []);
+}
+
+/* ============================================================
+   3. REGISTRO HISTORICO DE ENTIDADES INTERVENIDAS (casos reales)
+   ============================================================ */
+// NOTA: el listado de entidades intervenidas ya NO se declara aquí a mano.
+// Proviene de REAL_EVENTOS_INTERVENCION (motor/datos/eventos_intervencion.py),
+// inyectado más arriba por scripts/actualizar_interfaz.py, para garantizar
+// que solo se muestren eventos reales y verificables (ver README, sección
+// "Trazabilidad de exclusiones").
+
+/* ============================================================
+   4. COMPONENTES DE UI
+   ============================================================ */
+function fmtNum(n) {
+  return new Intl.NumberFormat("es-PE").format(Math.round(n));
+}
+
+function Chip({ active, onClick, children, color }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        borderColor: active ? (color || C.navy) : C.line,
+        background: active ? (color || C.navy) : C.panel,
+        color: active ? "#fff" : C.slate,
+      }}
+      className="px-3 py-1.5 text-xs font-medium border rounded-sm transition-colors whitespace-nowrap"
+    >
+      {children}
+    </button>
+  );
+}
+
+function KPICard({ icon: Icon, label, value, unit, delta, deltaGood, tone }) {
+  const positive = deltaGood;
+  return (
+    <div className=" border relative overflow-hidden" style={{ background: C.panel, borderColor: C.line }}>
+      <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: tone }} />
+      <div className="p-4 pl-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[11px] uppercase tracking-wide font-medium" style={{ color: C.slateSoft }}>{label}</span>
+          <Icon size={16} color={C.slateSoft} />
+        </div>
+        <div className="flex items-baseline gap-1">
+          <span className="text-3xl font-semibold" style={{ fontFamily: serif, color: C.navyText }}>{value}</span>
+          <span className="text-sm" style={{ color: C.slateSoft }}>{unit}</span>
+        </div>
+        <div className="flex items-center gap-1 mt-2">
+          {positive ? <TrendingUp size={13} color={C.emerald} /> : <TrendingDown size={13} color={C.crimson} />}
+          <span className="text-xs font-medium" style={{ color: positive ? C.emerald : C.crimson }}>
+            {delta > 0 ? "+" : ""}{delta.toFixed(2)} pp vs. periodo anterior
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, icon: Icon, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors"
+      style={{
+        borderColor: active ? C.gold : "transparent",
+        color: active ? C.navyText : C.slateSoft,
+      }}
+    >
+      <Icon size={15} />
+      {children}
+    </button>
+  );
+}
+
+function SectionTitle({ eyebrow, title }) {
+  return (
+    <div className="mb-4">
+      {eyebrow && <div className="text-[11px] font-medium tracking-wide" style={{ color: C.gold }}>{eyebrow}</div>}
+      <h3 className="text-lg font-semibold" style={{ fontFamily: serif, color: C.navyText }}>{title}</h3>
+    </div>
+  );
+}
+
+function CustomTooltip({ active, payload, label, suffix = "" }) {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className=" border p-3 text-xs shadow-sm" style={{ background: C.panel, borderColor: C.line }}>
+      <div className="font-semibold mb-1" style={{ color: C.navyText }}>{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} className="flex items-center gap-2 py-0.5">
+          <span className="w-2 h-2 rounded-full" style={{ background: p.color || p.fill }} />
+          <span style={{ color: C.slate }}>{p.name}:</span>
+          <span className="font-medium" style={{ color: C.navyText }}>{typeof p.value === "number" ? p.value.toLocaleString("es-PE") : p.value}{suffix}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================================================
+   5. APP PRINCIPAL
+   ============================================================ */
+function SBSDashboard() {
+  const data = useSystemData();
+
+  const [yearRange, setYearRange] = useState([2018, 2026]);
+  const [tipoFiltro, setTipoFiltro] = useState("todos");
+  const [selectedEntidades, setSelectedEntidades] = useState(["BCP", "CMAC Arequipa"]);
+  const [viewMode, setViewMode] = useState("historico"); // historico | predictivo
+  const [tab, setTab] = useState("resumen");
+  const [entityPickerOpen, setEntityPickerOpen] = useState(false);
+  const [causalFiltro, setCausalFiltro] = useState("todas");
+  const [ratingBank, setRatingBank] = useState("BANCO DE CREDITO");
+  const [darkMode, setDarkMode] = useState(false);
+
+  // ---- Predicción SEP2026 real (outputs/interfaz) ----
+  const [predTipoEntidad, setPredTipoEntidad] = useState("TODOS");
+  const [predEntidad, setPredEntidad] = useState("TODAS");
+  // ---- Entidades intervenidas reales (motor/datos/eventos_intervencion.py) ----
+  const [entidadIntervenidaSel, setEntidadIntervenidaSel] = useState(
+    REAL_EVENTOS_INTERVENCION[0]?.ENTITY_NAME_NORM || null
+  );
+
+  // Sincroniza la paleta activa (C) con el modo elegido en cada render.
+  Object.assign(C, darkMode ? DARK : LIGHT);
+
+  // sliders modelo predictivo
+  const [tasaRef, setTasaRef] = useState(4.75);
+  const [pbi, setPbi] = useState(2.5);
+  const [desempleo, setDesempleo] = useState(7.5);
+
+  const tiposDisponibles = tipoFiltro === "todos" ? Object.keys(ENTIDADES) : [tipoFiltro];
+
+  const entidadesDisponibles = useMemo(() => {
+    let list = [];
+    tiposDisponibles.forEach((t) => list.push(...ENTIDADES[t].map((n) => ({ nombre: n, tipo: t }))));
+    return list;
+  }, [tipoFiltro]);
+
+  const yearsInRange = YEARS.filter((y) => y >= yearRange[0] && y <= yearRange[1]);
+
+  function toggleEntidad(nombre) {
+    setSelectedEntidades((prev) =>
+      prev.includes(nombre) ? prev.filter((n) => n !== nombre) : prev.length >= 5 ? prev : [...prev, nombre]
+    );
+  }
+
+  function findTipoOf(nombre) {
+    for (const t of Object.keys(ENTIDADES)) if (ENTIDADES[t].includes(nombre)) return t;
+    return null;
+  }
+
+  // ---- Universo de KPIs: entidades seleccionadas, o si no hay ninguna, todas las del tipo filtrado ----
+  const kpiScope = useMemo(() => {
+    const names = selectedEntidades.length ? selectedEntidades : entidadesDisponibles.map((e) => e.nombre);
+    return names.filter((n) => tiposDisponibles.includes(findTipoOf(n)));
+  }, [selectedEntidades, tipoFiltro]);
+
+  function scopeAverageAt(year, field) {
+    const scope = kpiScope.length ? kpiScope : entidadesDisponibles.map((e) => e.nombre);
+    if (!scope.length) return 0;
+    let sum = 0, n = 0;
+    scope.forEach((name) => {
+      const tipo = findTipoOf(name);
+      const row = data[tipo][name].find((r) => r.year === year);
+      if (row) { sum += row[field]; n++; }
+    });
+    return n ? sum / n : 0;
+  }
+  function scopeSumAt(year, field) {
+    const scope = kpiScope.length ? kpiScope : entidadesDisponibles.map((e) => e.nombre);
+    let sum = 0;
+    scope.forEach((name) => {
+      const tipo = findTipoOf(name);
+      const row = data[tipo][name].find((r) => r.year === year);
+      if (row) sum += row[field];
+    });
+    return sum;
+  }
+
+  const lastYear = yearRange[1];
+  const prevYear = Math.max(yearRange[0], lastYear - 1);
+  const projFactor = viewMode === "predictivo" ? 1 : 0; // simple proyección +1 año
+
+  const kpi = {
+    morosidad: { v: scopeAverageAt(lastYear, "morosidad") + projFactor * 0.15, prev: scopeAverageAt(prevYear, "morosidad") },
+    roe: { v: scopeAverageAt(lastYear, "roe") - projFactor * 0.4, prev: scopeAverageAt(prevYear, "roe") },
+    capital: { v: scopeAverageAt(lastYear, "capital") + projFactor * 0.1, prev: scopeAverageAt(prevYear, "capital") },
+    creditos: { v: scopeSumAt(lastYear, "creditos") * (1 + projFactor * 0.045), prev: scopeSumAt(prevYear, "creditos") },
+  };
+
+  // ---- Series para gráficos históricos ----
+  const lineSeries = yearsInRange.map((year) => {
+    const row = { year };
+    (selectedEntidades.length ? selectedEntidades : entidadesDisponibles.slice(0, 3).map((e) => e.nombre)).forEach((name) => {
+      const tipo = findTipoOf(name);
+      const r = data[tipo][name].find((d) => d.year === year);
+      row[name + "_morosidad"] = r ? r.morosidad : null;
+      row[name + "_roe"] = r ? r.roe : null;
+    });
+    return row;
+  });
+
+  const barSeries = (selectedEntidades.length ? selectedEntidades : entidadesDisponibles.slice(0, 5).map((e) => e.nombre)).map((name) => {
+    const tipo = findTipoOf(name);
+    const r = data[tipo][name].find((d) => d.year === lastYear);
+    return { name, creditos: r ? r.creditos : 0, depositos: r ? r.depositos : 0 };
+  });
+
+  const treemapData = Object.keys(ENTIDADES).map((tipo) => ({
+    name: TIPOS.find((t) => t.id === tipo).label,
+    children: ENTIDADES[tipo].map((n) => {
+      const r = data[tipo][n].find((d) => d.year === lastYear);
+      return { name: n, size: r ? r.creditos : 1, color: TIPOS.find((t) => t.id === tipo).color };
+    }),
+  }));
+
+  // ---- Modelo predictivo ----
+  const startMorosidad = scopeAverageAt(lastYear, "morosidad");
+  const sensRate = 0.42, sensGdp = 0.5, sensUnemp = 0.3;
+  const projMeses = [3, 6, 9, 12, 15, 18, 21, 24];
+  const projData = projMeses.map((m) => {
+    const drift = (m / 24) * (sensRate * (tasaRef - 4.75) + sensUnemp * (desempleo - 7.5) - sensGdp * (pbi - 2.5));
+    const base = clamp(startMorosidad + drift, 0.8, 22);
+    const optimista = clamp(base - (0.3 + m * 0.035), 0.5, 22);
+    const pesimista = clamp(base + (0.3 + m * 0.055), 0.5, 24);
+    return { mes: `M${m}`, optimista, base: +base.toFixed(2), pesimista, banda: [+optimista.toFixed(2), +pesimista.toFixed(2)] };
+  });
+
+  // ---- Predicción SEP2026 REAL (outputs/interfaz/predicciones_SEP2026_*.xlsx, vía scripts/run_prediccion.py) ----
+  // Esta sección NUNCA calcula una predicción: solo lee y presenta REAL_PREDICCIONES_SEP2026,
+  // que ya viene resuelta por el motor (ver scripts/actualizar_interfaz.py).
+  const REAL_TIPO_LABEL = { BANCO: "Bancos", CMAC: "Cajas Municipales", CRAC: "Cajas Rurales", FINANCIERA: "Financieras" };
+  const RATING_MASTER_SCALE = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "E"];
+  function realRatingTone(r) {
+    if (!r) return { bg: C.chipBg, fg: C.slateSoft };
+    const i = RATING_MASTER_SCALE.indexOf(r);
+    if (i === -1) return { bg: C.chipBg, fg: C.slateSoft }; // RET / NR / token inválido
+    if (i <= 2) return { bg: C.emeraldSoft, fg: C.emerald };       // A+, A, A-
+    if (i <= 5) return { bg: C.amberSoft, fg: C.amber };           // B+, B, B-
+    if (i <= 8) return { bg: C.amberSoft, fg: "#9A5A12" };         // C+, C, C-
+    return { bg: C.crimsonSoft, fg: C.crimson };                    // D+, D, D-, E
+  }
+
+  const predTiposDisponibles = useMemo(() =>
+    [...new Set(REAL_PREDICCIONES_SEP2026.map((r) => r.ENTITY_TYPE))].sort(), []);
+  const predEntidadesDisponibles = useMemo(() => {
+    const scope = predTipoEntidad === "TODOS" ? REAL_PREDICCIONES_SEP2026 : REAL_PREDICCIONES_SEP2026.filter((r) => r.ENTITY_TYPE === predTipoEntidad);
+    return [...new Set(scope.map((r) => r.ENTITY_NAME))].sort();
+  }, [predTipoEntidad]);
+
+  const predFiltradas = useMemo(() => {
+    let rows = REAL_PREDICCIONES_SEP2026;
+    if (predTipoEntidad !== "TODOS") rows = rows.filter((r) => r.ENTITY_TYPE === predTipoEntidad);
+    if (predTipoEntidad !== "TODOS" && predEntidad !== "TODAS") rows = rows.filter((r) => r.ENTITY_NAME === predEntidad);
+    return rows;
+  }, [predTipoEntidad, predEntidad]);
+
+  // Pivot: una fila por entidad, con el rating anterior/predicho de cada ECR (N/D si esa ECR nunca calificó a la entidad)
+  const predPivot = useMemo(() => {
+    const porEntidad = {};
+    predFiltradas.forEach((r) => {
+      if (!porEntidad[r.ENTITY_NAME]) porEntidad[r.ENTITY_NAME] = { ENTITY_NAME: r.ENTITY_NAME, ENTITY_TYPE: r.ENTITY_TYPE, ecr: {} };
+      porEntidad[r.ENTITY_NAME].ecr[r.ECR] = r;
+    });
+    return Object.values(porEntidad).sort((a, b) => a.ENTITY_NAME.localeCompare(b.ENTITY_NAME));
+  }, [predFiltradas]);
+
+  const predKpi = useMemo(() => {
+    const entidadesUnicas = new Set(predFiltradas.map((r) => r.ENTITY_NAME));
+    const mejora = predFiltradas.filter((r) => r.CAMBIO_ORDINAL < 0).length;
+    const estable = predFiltradas.filter((r) => r.CAMBIO_ORDINAL === 0).length;
+    const deterioro = predFiltradas.filter((r) => r.CAMBIO_ORDINAL > 0).length;
+    const alertas = predFiltradas.filter((r) => r.ALERTA_DOWNGRADE_FUERTE).length;
+    return { entidades: entidadesUnicas.size, mejora, estable, deterioro, alertas };
+  }, [predFiltradas]);
+
+  // ---- Modelos de Predicción: comparación de los 4 modelos reales del motor ----
+  const modelosOrdenados = useMemo(() => {
+    return Object.entries(REAL_RESUMEN_MODELOS)
+      .map(([id, m]) => ({ id, ...m, ganadasEnECR: REAL_ECRS_CON_METRICAS.filter((ecr) => REAL_GANADOR_POR_ECR[ecr] === id).length }))
+      .sort((a, b) => (b.puntaje_promedio ?? -1) - (a.puntaje_promedio ?? -1));
+  }, []);
+  const ganadorGeneralId = modelosOrdenados[0]?.id;
+
+  const chartPuntajePorModelo = modelosOrdenados.map((m) => ({ modelo: m.label, puntaje: m.puntaje_promedio ?? 0 }));
+
+  const chartMetricasPorModelo = ["1-HistGB", "2-MLPOrdinal", "3-RegresionOrdinal", "4-LightGBM"].map((id) => {
+    const puntos = REAL_ECRS_CON_METRICAS.map((ecr) => REAL_METRICAS_POR_ECR[ecr].modelos[id]).filter(Boolean);
+    const avg = (campo) => puntos.length ? puntos.reduce((s, p) => s + (p[campo] ?? 0), 0) / puntos.length : null;
+    return {
+      modelo: REAL_MODELOS_LABEL[id],
+      "Weighted Kappa": _round2(avg("weighted_kappa")),
+      "F1 macro": _round2(avg("f1_macro")),
+      "MAE ordinal": _round2(avg("mae_ordinal")),
+    };
+  });
+  function _round2(v) { return v == null ? 0 : Math.round(v * 100) / 100; }
+
+  const chartPorECR = REAL_ECRS_CON_METRICAS.map((ecr) => {
+    const ganador = REAL_GANADOR_POR_ECR[ecr];
+    const puntaje = REAL_METRICAS_POR_ECR[ecr].modelos[ganador]?.puntaje ?? 0;
+    return { ecr, puntaje, ganador: REAL_MODELOS_LABEL[ganador] || ganador };
+  });
+
+  const tiposEvento = [...new Set(REAL_EVENTOS_INTERVENCION.map((i) => i.TIPO_EVENTO))];
+  const eventosFiltrados = causalFiltro === "todas" ? REAL_EVENTOS_INTERVENCION : REAL_EVENTOS_INTERVENCION.filter((i) => i.TIPO_EVENTO === causalFiltro);
+  const TIPO_EVENTO_LABEL = {
+    INTERVENCION_Y_LIQUIDACION: "Intervención y liquidación",
+    INTERVENCION: "Intervención",
+    DISOLUCION_VOLUNTARIA: "Disolución voluntaria",
+  };
+  const eventoSeleccionado = REAL_EVENTOS_INTERVENCION.find((e) => e.ENTITY_NAME_NORM === entidadIntervenidaSel) || REAL_EVENTOS_INTERVENCION[0];
+  const ecrsConHistorial = eventoSeleccionado ? [...new Set(eventoSeleccionado.historial.flatMap((p) => Object.keys(p).filter((k) => k !== "corte")))] : [];
+  const RATING_MASTER_SCALE_INT = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "E"];
+  const serieEventoSeleccionado = eventoSeleccionado ? eventoSeleccionado.historial.map((p) => {
+    const fila = { corte: p.corte };
+    ecrsConHistorial.forEach((ecr) => { fila[ecr] = p[ecr]?.valido ? p[ecr].ordinal : null; });
+    return fila;
+  }) : [];
+  const ECR_LINE_COLOR = { APOYO: C.navyText, CLASS: C.gold, JCR: C.emerald, MICRORATE: C.crimson, MOODYS: "#6D5BD0", PCR: C.amber };
+
+  return (
+    <div className="w-full min-h-full" style={{ background: C.paper, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      {/* HEADER */}
+      <div style={{ background: C.navy }} className="px-6 py-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 flex items-center justify-center border" style={{ borderColor: C.gold }}>
+              <Landmark size={18} color={C.gold} />
+            </div>
+            <div>
+              <h1 className="text-xl text-white font-semibold" style={{ fontFamily: serif }}>Panel de Estabilidad del Sistema Financiero Peruano</h1>
+              <p className="text-xs" style={{ color: "#9AA9C4" }}>Indicadores simulados con fines ilustrativos, en base a la metodología y variables reportadas por la SBS · {yearRange[0]}–{yearRange[1]}</p>
+            </div>
+          </div>
+          <button onClick={() => setDarkMode((d) => !d)}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium border shrink-0"
+            style={{ borderColor: C.gold, color: C.gold }}>
+            {darkMode ? <Sun size={14} /> : <Moon size={14} />}
+            {darkMode ? "Modo claro" : "Modo oscuro"}
+          </button>
+        </div>
+      </div>
+
+      {/* FILTROS GLOBALES */}
+      <div className=" border-b px-6 py-4" style={{ background: C.panel, borderColor: C.line }}>
+        <div className="flex flex-wrap items-end gap-6">
+          {/* Rango de años */}
+          <div className="min-w-[220px]">
+            <div className="flex items-center gap-1.5 mb-2 text-[11px] uppercase tracking-wide font-medium" style={{ color: C.slateSoft }}>
+              <CalendarRange size={13} /> Rango de años
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="range" min={2015} max={2026} value={yearRange[0]}
+                onChange={(e) => setYearRange([Math.min(+e.target.value, yearRange[1]), yearRange[1]])}
+                className="w-20 accent-current" style={{ color: C.navyText }} />
+              <span className="text-sm font-medium tabular-nums" style={{ color: C.navyText }}>{yearRange[0]}</span>
+              <span style={{ color: C.slateSoft }}>–</span>
+              <input type="range" min={2015} max={2026} value={yearRange[1]}
+                onChange={(e) => setYearRange([yearRange[0], Math.max(+e.target.value, yearRange[0])])}
+                className="w-20 accent-current" style={{ color: C.navyText }} />
+              <span className="text-sm font-medium tabular-nums" style={{ color: C.navyText }}>{yearRange[1]}</span>
+            </div>
+          </div>
+
+          {/* Tipo de entidad */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-2 text-[11px] uppercase tracking-wide font-medium" style={{ color: C.slateSoft }}>
+              <Filter size={13} /> Tipo de entidad
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              <Chip active={tipoFiltro === "todos"} onClick={() => setTipoFiltro("todos")}>Todas</Chip>
+              {TIPOS.map((t) => (
+                <Chip key={t.id} active={tipoFiltro === t.id} color={t.color} onClick={() => setTipoFiltro(t.id)}>{t.label}</Chip>
+              ))}
+            </div>
+          </div>
+
+          {/* Entidad especifica (multi) */}
+          <div className="relative">
+            <div className="flex items-center gap-1.5 mb-2 text-[11px] uppercase tracking-wide font-medium" style={{ color: C.slateSoft }}>
+              <Building2 size={13} /> Entidades a comparar
+            </div>
+            <button onClick={() => setEntityPickerOpen((o) => !o)}
+              className="flex items-center gap-2 px-3 py-1.5 border text-sm" style={{ background: C.panel, borderColor: C.line, color: C.navyText }}>
+              {selectedEntidades.length ? `${selectedEntidades.length} seleccionadas` : "Todas las del filtro"}
+              <ChevronDown size={14} />
+            </button>
+            {entityPickerOpen && (
+              <div className="absolute z-20 mt-1 w-72 max-h-72 overflow-y-auto border shadow-md p-2" style={{ background: C.panel, borderColor: C.line }}>
+                {entidadesDisponibles.map((e) => (
+                  <label key={e.nombre} className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-50">
+                    <input type="checkbox" checked={selectedEntidades.includes(e.nombre)} onChange={() => toggleEntidad(e.nombre)} />
+                    <span style={{ color: C.navyText }}>{e.nombre}</span>
+                    <span className="ml-auto text-[10px] uppercase" style={{ color: C.slateSoft }}>{e.tipo}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {selectedEntidades.length > 0 && (
+              <div className="flex gap-1 flex-wrap mt-1.5 max-w-[280px]">
+                {selectedEntidades.map((n) => (
+                  <span key={n} className="flex items-center gap-1 text-[11px] px-2 py-0.5" style={{ background: C.line, color: C.navyText }}>
+                    {n}
+                    <X size={11} className="cursor-pointer" onClick={() => toggleEntidad(n)} />
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Modo de vista */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-2 text-[11px] uppercase tracking-wide font-medium" style={{ color: C.slateSoft }}>
+              <Gauge size={13} /> Modo de vista
+            </div>
+            <div className="flex border" style={{ borderColor: C.line }}>
+              <button onClick={() => setViewMode("historico")} className="px-3 py-1.5 text-xs font-medium flex items-center gap-1.5"
+                style={{ background: viewMode === "historico" ? C.navy : C.panel, color: viewMode === "historico" ? "#fff" : C.slate }}>
+                <History size={13} /> Histórica
+              </button>
+              <button onClick={() => setViewMode("predictivo")} className="px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 border-l"
+                style={{ borderColor: C.line, background: viewMode === "predictivo" ? C.navy : C.panel, color: viewMode === "predictivo" ? "#fff" : C.slate }}>
+                <LineChartIcon size={13} /> Proyección
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* TABS */}
+      <div className=" border-b px-6 flex gap-1" style={{ background: C.panel, borderColor: C.line }}>
+        <TabButton active={tab === "resumen"} onClick={() => setTab("resumen")} icon={LayoutGrid}>Resumen</TabButton>
+        <TabButton active={tab === "historico"} onClick={() => setTab("historico")} icon={Activity}>Análisis Histórico</TabButton>
+        <TabButton active={tab === "predictivo"} onClick={() => setTab("predictivo")} icon={SlidersHorizontal}>Modelo Predictivo</TabButton>
+        <TabButton active={tab === "modelos"} onClick={() => setTab("modelos")} icon={Trophy}>Modelos de Predicción</TabButton>
+        <TabButton active={tab === "prediccionSep"} onClick={() => setTab("prediccionSep")} icon={CalendarClock}>Predicción Setiembre</TabButton>
+        <TabButton active={tab === "intervenidas"} onClick={() => setTab("intervenidas")} icon={ScrollText}>Entidades Intervenidas</TabButton>
+      </div>
+
+      <div className="p-6 max-w-[1400px] mx-auto">
+        {/* ============ KPIs (siempre visibles arriba, excepto en Intervenidas) ============ */}
+        {tab !== "intervenidas" && tab !== "prediccionSep" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <KPICard icon={Percent} label={viewMode === "predictivo" ? "Morosidad proyectada" : "Morosidad promedio"}
+              value={kpi.morosidad.v.toFixed(2)} unit="%"
+              delta={kpi.morosidad.v - kpi.morosidad.prev} deltaGood={kpi.morosidad.v <= kpi.morosidad.prev}
+              tone={kpi.morosidad.v <= kpi.morosidad.prev ? C.emerald : C.crimson} />
+            <KPICard icon={TrendingUp} label="Rentabilidad patrimonial (ROE)"
+              value={kpi.roe.v.toFixed(2)} unit="%"
+              delta={kpi.roe.v - kpi.roe.prev} deltaGood={kpi.roe.v >= kpi.roe.prev}
+              tone={kpi.roe.v >= kpi.roe.prev ? C.emerald : C.crimson} />
+            <KPICard icon={ShieldCheck} label="Ratio de Capital Global"
+              value={kpi.capital.v.toFixed(2)} unit="%"
+              delta={kpi.capital.v - kpi.capital.prev} deltaGood={kpi.capital.v >= kpi.capital.prev}
+              tone={kpi.capital.v >= 14 ? C.emerald : C.amber} />
+            <KPICard icon={CircleDollarSign} label="Créditos directos totales"
+              value={fmtNum(kpi.creditos.v)} unit="S/ MM"
+              delta={((kpi.creditos.v - kpi.creditos.prev) / (kpi.creditos.prev || 1)) * 100} deltaGood={kpi.creditos.v >= kpi.creditos.prev}
+              tone={C.emerald} />
+          </div>
+        )}
+
+        {/* ============ TAB: RESUMEN ============ */}
+        {tab === "resumen" && (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 border p-5" style={{ background: C.panel, borderColor: C.line }}>
+                <SectionTitle eyebrow="Serie del sistema" title="Morosidad y ROE — entidades seleccionadas" />
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={lineSeries}>
+                    <CartesianGrid stroke={C.line} vertical={false} />
+                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={false} tickLine={false} width={35} />
+                    <Tooltip content={<CustomTooltip suffix="%" />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    {(selectedEntidades.length ? selectedEntidades : entidadesDisponibles.slice(0, 3).map((e) => e.nombre)).map((name, i) => (
+                      <Line key={name} type="monotone" dataKey={name + "_morosidad"} name={`${name} · Morosidad`}
+                        stroke={[C.crimson, C.navyText, C.gold, C.emerald, C.slate][i % 5]} strokeWidth={2} dot={false} />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className=" border p-5" style={{ background: C.panel, borderColor: C.line }}>
+                <SectionTitle eyebrow="Cuota de mercado" title="Composición del sistema" />
+                <ResponsiveContainer width="100%" height={280}>
+                  <Treemap data={treemapData} dataKey="size" stroke={C.panel} fill={C.navyText}>
+                    <Tooltip content={<CustomTooltip />} />
+                  </Treemap>
+                </ResponsiveContainer>
+                <p className="text-[11px] mt-2" style={{ color: C.slateSoft }}>Tamaño proporcional a créditos directos ({lastYear}). Datos simulados.</p>
+              </div>
+            </div>
+
+            <div className=" border p-5" style={{ background: C.panel, borderColor: C.line }}>
+              <SectionTitle eyebrow="Solidez comparada" title="Créditos vs. Depósitos por entidad" />
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={barSeries}>
+                  <CartesianGrid stroke={C.line} vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={false} tickLine={false} width={45} />
+                  <Tooltip content={<CustomTooltip suffix=" MM" />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="creditos" name="Créditos directos (S/ MM)" fill={C.navyText} />
+                  <Bar dataKey="depositos" name="Depósitos captados (S/ MM)" fill={C.gold} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* ============ TAB: HISTORICO ============ */}
+        {tab === "historico" && (
+          <div className="space-y-8">
+            <div className=" border p-5" style={{ background: C.panel, borderColor: C.line }}>
+              <SectionTitle eyebrow="Evolución temporal" title="Morosidad por entidad seleccionada" />
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={lineSeries}>
+                  <CartesianGrid stroke={C.line} vertical={false} />
+                  <XAxis dataKey="year" tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={false} tickLine={false} width={35} />
+                  <Tooltip content={<CustomTooltip suffix="%" />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {(selectedEntidades.length ? selectedEntidades : entidadesDisponibles.slice(0, 3).map((e) => e.nombre)).map((name, i) => (
+                    <Area key={name} type="monotone" dataKey={name + "_morosidad"} name={`${name} · Morosidad`}
+                      stroke={[C.crimson, C.navyText, C.gold, C.emerald, C.slate][i % 5]}
+                      fill={[C.crimsonSoft, "#DCE3F0", C.amberSoft, C.emeraldSoft, "#EDEFF2"][i % 5]} strokeWidth={2} />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className=" border p-5" style={{ background: C.panel, borderColor: C.line }}>
+              <SectionTitle eyebrow="Rentabilidad" title="Evolución de ROE por entidad seleccionada" />
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={lineSeries}>
+                  <CartesianGrid stroke={C.line} vertical={false} />
+                  <XAxis dataKey="year" tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={false} tickLine={false} width={35} />
+                  <ReferenceLine y={0} stroke={C.slateSoft} />
+                  <Tooltip content={<CustomTooltip suffix="%" />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {(selectedEntidades.length ? selectedEntidades : entidadesDisponibles.slice(0, 3).map((e) => e.nombre)).map((name, i) => (
+                    <Line key={name} type="monotone" dataKey={name + "_roe"} name={`${name} · ROE`}
+                      stroke={[C.emerald, C.navyText, C.gold, C.crimson, C.slate][i % 5]} strokeWidth={2} dot={false} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className=" border p-5" style={{ background: C.panel, borderColor: C.line }}>
+              <SectionTitle eyebrow="Comparación directa" title={`Cartera de créditos y captaciones — ${lastYear}`} />
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={barSeries} layout="vertical" margin={{ left: 20 }}>
+                  <CartesianGrid stroke={C.line} horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: C.navyText }} axisLine={false} tickLine={false} width={130} />
+                  <Tooltip content={<CustomTooltip suffix=" MM" />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="creditos" name="Créditos (S/ MM)" fill={C.navyText} />
+                  <Bar dataKey="depositos" name="Depósitos (S/ MM)" fill={C.gold} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* ---- Historial REAL de clasificación de riesgo 2012-2026 ---- */}
+            <div className=" border p-5" style={{ background: C.panel, borderColor: C.line }}>
+              <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
+                <SectionTitle eyebrow="Datos reales · clasificadoras de riesgo" title="Historial de clasificación de riesgo por banco (2012–2026)" />
+                <div className="min-w-[220px]">
+                  <div className="text-[11px] uppercase tracking-wide font-medium mb-1" style={{ color: C.slateSoft }}>Banco</div>
+                  <select value={ratingBank} onChange={(e) => setRatingBank(e.target.value)}
+                    className="w-full px-3 py-1.5 border text-sm" style={{ background: C.panel, borderColor: C.line, color: C.navyText }}>
+                    {Object.keys(RATINGS_DATA).sort().map((b) => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+              </div>
+              <p className="text-xs mb-3" style={{ color: C.slateSoft }}>
+                Clasificación semestral (marzo/setiembre) reportada por las seis agencias que cubren la banca peruana. Escala de mejor a peor riesgo: AAA/AA/A (grado de inversión), BBB/BB (grado medio), B/C (mayor riesgo relativo dentro del sistema).
+              </p>
+              <div className="overflow-auto max-h-96 border" style={{ borderColor: C.line }}>
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr style={{ background: C.navy }}>
+                      <th className="text-left px-3 py-2 font-medium text-white sticky top-0" style={{ background: C.navy }}>Periodo</th>
+                      {AGENCY_LIST.map((a) => (
+                        <th key={a} className="text-center px-3 py-2 font-medium text-white sticky top-0" style={{ background: C.navy }}>{a}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {RATING_PERIODS.map((p, i) => {
+                      const row = (RATINGS_DATA[ratingBank] || {})[p] || {};
+                      return (
+                        <tr key={p} style={{ background: i % 2 ? C.panelAlt : C.panel, borderTop: `1px solid ${C.line}` }}>
+                          <td className="px-3 py-1.5 font-medium" style={{ color: C.navyText }}>{p}</td>
+                          {AGENCY_LIST.map((a) => {
+                            const r = row[a];
+                            const tone = ratingTone(r);
+                            return (
+                              <td key={a} className="text-center px-3 py-1.5">
+                                {r ? (
+                                  <span className="inline-block px-2 py-0.5 font-medium" style={{ background: tone.bg, color: tone.fg }}>{r}</span>
+                                ) : (
+                                  <span style={{ color: "#C7CCD4" }}>—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============ TAB: PREDICTIVO ============ */}
+        {tab === "predictivo" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-3 flex items-start gap-3 border p-3 text-xs" style={{ background: C.chipBg, borderColor: C.line, color: C.slateSoft }}>
+              <Info size={14} className="shrink-0 mt-0.5" />
+              Este simulador es un ejercicio ilustrativo de sensibilidad (no usa los 4 modelos de clasificación del motor). Para el desempeño real de los modelos y sus predicciones, ver "Modelos de Predicción" y "Predicción Setiembre".
+            </div>
+            <div className=" border p-5" style={{ background: C.panel, borderColor: C.line }}>
+              <SectionTitle eyebrow="Simulación de escenarios" title="Variables macroeconómicas" />
+              <div className="space-y-6">
+                <div>
+                  <div className="flex justify-between text-xs mb-1" style={{ color: C.slate }}>
+                    <span>Tasa de referencia BCRP</span><span className="font-semibold" style={{ color: C.navyText }}>{tasaRef.toFixed(2)}%</span>
+                  </div>
+                  <input type="range" min={2} max={8} step={0.25} value={tasaRef} onChange={(e) => setTasaRef(+e.target.value)} className="w-full" style={{ accentColor: C.navyText }} />
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs mb-1" style={{ color: C.slate }}>
+                    <span>Crecimiento del PBI (anual)</span><span className="font-semibold" style={{ color: C.navyText }}>{pbi.toFixed(2)}%</span>
+                  </div>
+                  <input type="range" min={-2} max={6} step={0.25} value={pbi} onChange={(e) => setPbi(+e.target.value)} className="w-full" style={{ accentColor: C.emerald }} />
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs mb-1" style={{ color: C.slate }}>
+                    <span>Tasa de desempleo</span><span className="font-semibold" style={{ color: C.navyText }}>{desempleo.toFixed(2)}%</span>
+                  </div>
+                  <input type="range" min={5} max={12} step={0.25} value={desempleo} onChange={(e) => setDesempleo(+e.target.value)} className="w-full" style={{ accentColor: C.crimson }} />
+                </div>
+                <div className="pt-3 border-t flex items-start gap-2" style={{ borderColor: C.line }}>
+                  <Info size={14} color={C.slateSoft} className="mt-0.5 shrink-0" />
+                  <p className="text-[11px]" style={{ color: C.slateSoft }}>
+                    El modelo aplica sensibilidades ilustrativas de la morosidad ante cambios en la tasa de referencia, el PBI y el desempleo, tomando como punto de partida el promedio {lastYear} de las entidades seleccionadas.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2 border p-5" style={{ background: C.panel, borderColor: C.line }}>
+              <SectionTitle eyebrow={`Proyección a 24 meses · punto de partida ${startMorosidad.toFixed(2)}%`} title="Morosidad proyectada con bandas de confianza" />
+              <ResponsiveContainer width="100%" height={340}>
+                <ComposedChart data={projData}>
+                  <CartesianGrid stroke={C.line} vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={false} tickLine={false} width={35} />
+                  <Tooltip content={<CustomTooltip suffix="%" />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Area dataKey="banda" name="Rango optimista–pesimista" stroke="none" fill="#DCE3F0" fillOpacity={0.7} />
+                  <Line type="monotone" dataKey="base" name="Escenario base" stroke={C.navyText} strokeWidth={2.5} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="optimista" name="Escenario optimista" stroke={C.emerald} strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+                  <Line type="monotone" dataKey="pesimista" name="Escenario pesimista" stroke={C.crimson} strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+              <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t" style={{ borderColor: C.line }}>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide" style={{ color: C.emerald }}>Optimista (mes 24)</div>
+                  <div className="text-xl font-semibold" style={{ fontFamily: serif, color: C.navyText }}>{projData[projData.length - 1].optimista.toFixed(2)}%</div>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide" style={{ color: C.navyText }}>Base (mes 24)</div>
+                  <div className="text-xl font-semibold" style={{ fontFamily: serif, color: C.navyText }}>{projData[projData.length - 1].base.toFixed(2)}%</div>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide" style={{ color: C.crimson }}>Pesimista (mes 24)</div>
+                  <div className="text-xl font-semibold" style={{ fontFamily: serif, color: C.navyText }}>{projData[projData.length - 1].pesimista.toFixed(2)}%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============ TAB: MODELOS DE PREDICCION (comparación real de modelos) ============ */}
+        {tab === "modelos" && (
+          <div className="space-y-8">
+            <div className="flex items-start gap-3 border p-4" style={{ background: C.panel, borderColor: C.line }}>
+              <Trophy size={18} color={C.gold} className="shrink-0 mt-0.5" />
+              <p className="text-sm" style={{ color: C.slate }}>
+                Comparación real de los 4 modelos evaluados por el motor (<code>scripts/run_evaluacion.py</code>) sobre el holdout MAR2026, por cada ECR. El "ganador" de cada ECR y el puntaje compuesto se calculan con la metodología exacta de <code>motor/modelos/comparacion/seleccion.py</code> (pesos: Weighted Kappa 35%, MAE ordinal invertido 25%, F1 macro 20%, resto redistribuido). No es una opinión editorial: es el resultado ya producido por el motor.
+              </p>
+            </div>
+
+            {REAL_ECRS_SIN_METRICAS.length > 0 && (
+              <div className="flex items-center gap-2 text-xs border px-3 py-2" style={{ background: C.amberSoft, borderColor: C.amber, color: "#8A5A12" }}>
+                <Info size={14} /> Sin métricas de holdout disponibles para: {REAL_ECRS_SIN_METRICAS.join(", ")}. No se incluyen en los gráficos comparativos de esta sección (no se fabrica un dato inexistente).
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {modelosOrdenados.map((m) => (
+                <div key={m.id} className="border p-4 relative" style={{ background: C.panel, borderColor: m.id === ganadorGeneralId ? C.gold : C.line, borderWidth: m.id === ganadorGeneralId ? 2 : 1 }}>
+                  {m.id === ganadorGeneralId && (
+                    <span className="absolute -top-2.5 right-3 text-[10px] font-semibold px-2 py-0.5 flex items-center gap-1" style={{ background: C.gold, color: "#fff" }}>
+                      <Trophy size={10} /> GANADOR
+                    </span>
+                  )}
+                  <div className="text-[11px] uppercase tracking-wide font-medium" style={{ color: C.slateSoft }}>{m.id}</div>
+                  <div className="text-sm font-semibold mb-2" style={{ fontFamily: serif, color: C.navyText }}>{m.label}</div>
+                  <div className="text-2xl font-semibold" style={{ color: C.navyText }}>{m.puntaje_promedio != null ? m.puntaje_promedio.toFixed(3) : "N/D"}</div>
+                  <div className="text-[11px]" style={{ color: C.slateSoft }}>puntaje compuesto promedio ({m.n_ecr} ECR)</div>
+                  <div className="text-[11px] mt-2 pt-2 border-t" style={{ borderColor: C.line, color: C.slate }}>Modelo ganador en {m.ganadasEnECR} de {REAL_ECRS_CON_METRICAS.length} ECR evaluadas</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="border p-5" style={{ background: C.panel, borderColor: C.line }}>
+                <SectionTitle eyebrow="Ranking global" title="Puntaje compuesto promedio por modelo" />
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={chartPuntajePorModelo} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid stroke={C.line} horizontal={false} />
+                    <XAxis type="number" domain={[0, 1]} tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} />
+                    <YAxis type="category" dataKey="modelo" width={160} tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={false} tickLine={false} />
+                    <Tooltip />
+                    <Bar dataKey="puntaje" name="Puntaje compuesto" fill={C.navyText} radius={[0, 3, 3, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="border p-5" style={{ background: C.panel, borderColor: C.line }}>
+                <SectionTitle eyebrow="Desempeño por ECR" title="Modelo ganador y puntaje por agencia clasificadora" />
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={chartPorECR}>
+                    <CartesianGrid stroke={C.line} vertical={false} />
+                    <XAxis dataKey="ecr" tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} />
+                    <YAxis domain={[0, 1]} tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip formatter={(v, n, p) => [v.toFixed(3), `Ganador: ${p.payload.ganador}`]} />
+                    <Bar dataKey="puntaje" name="Puntaje del modelo ganador" fill={C.gold} radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <p className="text-[11px] mt-2" style={{ color: C.slateSoft }}>Cada barra corresponde al modelo que ganó esa ECR específica (pasa el cursor para ver cuál).</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="border p-5" style={{ background: C.panel, borderColor: C.line }}>
+                <SectionTitle eyebrow="Precisión (promedio entre ECR evaluadas)" title="Weighted Kappa y F1 macro por modelo" />
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={chartMetricasPorModelo}>
+                    <CartesianGrid stroke={C.line} vertical={false} />
+                    <XAxis dataKey="modelo" tick={{ fontSize: 10, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} interval={0} angle={-15} textAnchor="end" height={60} />
+                    <YAxis domain={[0, 1]} tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="Weighted Kappa" fill={C.navyText} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="F1 macro" fill={C.emerald} radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="border p-5" style={{ background: C.panel, borderColor: C.line }}>
+                <SectionTitle eyebrow="Error (promedio entre ECR evaluadas)" title="MAE ordinal por modelo (menor es mejor)" />
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={chartMetricasPorModelo}>
+                    <CartesianGrid stroke={C.line} vertical={false} />
+                    <XAxis dataKey="modelo" tick={{ fontSize: 10, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} interval={0} angle={-15} textAnchor="end" height={60} />
+                    <YAxis tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip />
+                    <Bar dataKey="MAE ordinal" fill={C.crimson} radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="border p-5" style={{ background: C.panel, borderColor: C.line }}>
+              <SectionTitle eyebrow="Detalle" title="Métricas de holdout por ECR y modelo" />
+              <div className="overflow-auto border" style={{ borderColor: C.line }}>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr style={{ background: C.navy }}>
+                      <th className="text-left px-3 py-2 font-medium text-white">ECR</th>
+                      <th className="text-left px-3 py-2 font-medium text-white">Modelo</th>
+                      <th className="text-center px-3 py-2 font-medium text-white">n (holdout)</th>
+                      <th className="text-center px-3 py-2 font-medium text-white">Accuracy</th>
+                      <th className="text-center px-3 py-2 font-medium text-white">F1 macro</th>
+                      <th className="text-center px-3 py-2 font-medium text-white">MAE ordinal</th>
+                      <th className="text-center px-3 py-2 font-medium text-white">Weighted Kappa</th>
+                      <th className="text-center px-3 py-2 font-medium text-white">Puntaje</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {REAL_ECRS_CON_METRICAS.map((ecr) => Object.entries(REAL_METRICAS_POR_ECR[ecr].modelos).map(([id, met], i) => (
+                      <tr key={ecr + id} style={{ background: id === REAL_GANADOR_POR_ECR[ecr] ? C.emeraldSoft : (i % 2 ? C.panelAlt : C.panel), borderTop: `1px solid ${C.line}` }}>
+                        <td className="px-3 py-1.5 font-medium" style={{ color: C.navyText }}>{i === 0 ? ecr : ""}</td>
+                        <td className="px-3 py-1.5" style={{ color: C.slate }}>{REAL_MODELOS_LABEL[id]} {id === REAL_GANADOR_POR_ECR[ecr] && <Trophy size={11} className="inline ml-1 -mt-0.5" color={C.gold} />}</td>
+                        <td className="text-center px-3 py-1.5" style={{ color: C.slateSoft }}>{met.n ?? "—"}</td>
+                        <td className="text-center px-3 py-1.5" style={{ color: C.slateSoft }}>{met.accuracy != null ? met.accuracy.toFixed(3) : "—"}</td>
+                        <td className="text-center px-3 py-1.5" style={{ color: C.slateSoft }}>{met.f1_macro != null ? met.f1_macro.toFixed(3) : "—"}</td>
+                        <td className="text-center px-3 py-1.5" style={{ color: C.slateSoft }}>{met.mae_ordinal != null ? met.mae_ordinal.toFixed(3) : "—"}</td>
+                        <td className="text-center px-3 py-1.5" style={{ color: C.slateSoft }}>{met.weighted_kappa != null ? met.weighted_kappa.toFixed(3) : "—"}</td>
+                        <td className="text-center px-3 py-1.5 font-semibold" style={{ color: C.navyText }}>{met.puntaje != null ? met.puntaje.toFixed(3) : "—"}</td>
+                      </tr>
+                    )))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] mt-2" style={{ color: C.slateSoft }}>Fuente: <code>outputs/analisis/metricas_holdout_&#123;ECR&#125;.csv</code>. Datos actualizados: {REAL_ACTUALIZADO_EN}.</p>
+            </div>
+          </div>
+        )}
+        {tab === "prediccionSep" && (
+          <div className="space-y-8">
+            <div className="flex items-start gap-3 border p-4" style={{ background: C.panel, borderColor: C.line }}>
+              <CalendarClock size={18} color={C.gold} className="shrink-0 mt-0.5" />
+              <p className="text-sm" style={{ color: C.slate }}>
+                Predicción real del motor para el corte <strong>{REAL_CORTE_OBJETIVO}</strong>, generada por <code>scripts/run_prediccion.py</code> y leída directamente de <code>outputs/interfaz/</code>. Esta interfaz no entrena modelos ni recalcula clasificaciones: solo visualiza el resultado ya producido por el motor.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <KPICard icon={Building2} label="Entidades analizadas" value={predKpi.entidades} unit=""
+                delta={0} deltaGood={true} tone={C.navyText} />
+              <KPICard icon={TrendingUp} label="Predicciones de mejora" value={predKpi.mejora} unit=""
+                delta={0} deltaGood={true} tone={C.emerald} />
+              <KPICard icon={Activity} label="Predicciones estables" value={predKpi.estable} unit=""
+                delta={0} deltaGood={true} tone={C.slate} />
+              <KPICard icon={TrendingDown} label="Predicciones de deterioro" value={predKpi.deterioro} unit=""
+                delta={0} deltaGood={predKpi.deterioro === 0} tone={predKpi.deterioro > 0 ? C.crimson : C.emerald} />
+              <KPICard icon={AlertTriangle} label="Entidades excluidas (intervención SBS)" value={REAL_ENTIDADES_EXCLUIDAS.length} unit=""
+                delta={0} deltaGood={true} tone={C.amber} />
+            </div>
+            {predKpi.alertas > 0 && (
+              <div className="flex items-center gap-2 text-xs border px-3 py-2" style={{ background: C.crimsonSoft, borderColor: C.crimson, color: C.crimson }}>
+                <AlertTriangle size={14} /> {predKpi.alertas} predicción(es) con alerta de downgrade fuerte (≥{2} escalones) en el alcance filtrado.
+              </div>
+            )}
+
+            <div className="border p-5" style={{ background: C.panel, borderColor: C.line }}>
+              <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
+                <SectionTitle eyebrow="Clasificación de riesgo · datos reales" title={`Proyección para ${REAL_CORTE_OBJETIVO === "SEP2026" ? "setiembre 2026" : REAL_CORTE_OBJETIVO}`} />
+                <div className="flex gap-3 flex-wrap">
+                  <div className="min-w-[180px]">
+                    <div className="text-[11px] uppercase tracking-wide font-medium mb-1" style={{ color: C.slateSoft }}>Tipo de entidad</div>
+                    <select value={predTipoEntidad}
+                      onChange={(e) => { setPredTipoEntidad(e.target.value); setPredEntidad("TODAS"); }}
+                      className="w-full px-3 py-1.5 border text-sm" style={{ background: C.panel, borderColor: C.line, color: C.navyText }}>
+                      <option value="TODOS">TODOS</option>
+                      {predTiposDisponibles.map((t) => <option key={t} value={t}>{REAL_TIPO_LABEL[t] || t}</option>)}
+                    </select>
+                  </div>
+                  <div className="min-w-[220px]">
+                    <div className="text-[11px] uppercase tracking-wide font-medium mb-1" style={{ color: C.slateSoft }}>Entidad</div>
+                    <select value={predEntidad} onChange={(e) => setPredEntidad(e.target.value)}
+                      disabled={predTipoEntidad === "TODOS"}
+                      className="w-full px-3 py-1.5 border text-sm" style={{
+                        background: predTipoEntidad === "TODOS" ? C.chipBg : C.panel,
+                        borderColor: C.line, color: predTipoEntidad === "TODOS" ? C.slateSoft : C.navyText,
+                        cursor: predTipoEntidad === "TODOS" ? "not-allowed" : "pointer",
+                      }}>
+                      <option value="TODAS">TODAS</option>
+                      {predEntidadesDisponibles.map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-auto max-h-[520px] border" style={{ borderColor: C.line }}>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr style={{ background: C.navy }}>
+                      <th className="text-left px-3 py-2 font-medium text-white sticky top-0" style={{ background: C.navy }}>Entidad</th>
+                      <th className="text-left px-3 py-2 font-medium text-white sticky top-0" style={{ background: C.navy }}>Tipo</th>
+                      {AGENCY_LIST.map((a) => (
+                        <th key={a} className="text-center px-3 py-2 font-medium text-white sticky top-0" style={{ background: C.navy }}>{a}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {predPivot.map((fila, i) => (
+                      <tr key={fila.ENTITY_NAME} style={{ background: i % 2 ? C.panelAlt : C.panel, borderTop: `1px solid ${C.line}` }}>
+                        <td className="px-3 py-1.5 font-medium whitespace-nowrap" style={{ color: C.navyText }}>{fila.ENTITY_NAME}</td>
+                        <td className="px-3 py-1.5" style={{ color: C.slateSoft }}>{REAL_TIPO_LABEL[fila.ENTITY_TYPE] || fila.ENTITY_TYPE}</td>
+                        {AGENCY_LIST.map((a) => {
+                          const p = fila.ecr[a.toUpperCase()];
+                          if (!p) return <td key={a} className="text-center px-3 py-1.5" style={{ color: C.slateSoft }}>N/D</td>;
+                          const toneAnt = realRatingTone(p.RATING_ANTERIOR);
+                          const tonePred = realRatingTone(p.RATING_PREDICHO);
+                          return (
+                            <td key={a} className="text-center px-3 py-1.5 whitespace-nowrap">
+                              <span className="inline-block px-1.5 py-0.5 mr-1" style={{ background: toneAnt.bg, color: toneAnt.fg }}>{p.RATING_ANTERIOR}</span>
+                              <span style={{ color: C.slateSoft }}>→</span>
+                              <span className="inline-block px-1.5 py-0.5 ml-1 font-semibold" style={{ background: tonePred.bg, color: tonePred.fg }}>{p.RATING_PREDICHO}</span>
+                              {p.ALERTA_DOWNGRADE_FUERTE && <AlertTriangle size={11} color={C.crimson} className="inline ml-1 -mt-0.5" />}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                    {predPivot.length === 0 && (
+                      <tr><td colSpan={2 + AGENCY_LIST.length} className="px-3 py-4 text-center" style={{ color: C.slateSoft }}>Sin resultados para el filtro seleccionado.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] mt-2" style={{ color: C.slateSoft }}>
+                "N/D" indica que esa ECR nunca calificó a la entidad (no hay clasificación anterior de la que partir), por lo que el motor no genera una predicción para esa combinación. Las 4 entidades con evento de intervención SBS confirmado (ver pestaña "Entidades Intervenidas") se excluyen de esta tabla — no se les proyecta un futuro.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ============ TAB: INTERVENIDAS ============ */}
+        {tab === "intervenidas" && (
+          <div className="space-y-6">
+            <div className="flex items-start gap-3 border p-4" style={{ background: C.panel, borderColor: C.line }}>
+              <AlertTriangle size={18} color={C.amber} className="shrink-0 mt-0.5" />
+              <p className="text-sm" style={{ color: C.slate }}>
+                Registro real y curado de las entidades del sistema financiero peruano con evento de intervención SBS confirmado durante el periodo del panel (<code>motor/datos/eventos_intervencion.py</code>). Estas {REAL_EVENTOS_INTERVENCION.length} entidades se excluyen automáticamente de la predicción SEP2026 (no se les proyecta un futuro): ver pestaña "Predicción Setiembre".
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] uppercase tracking-wide font-medium" style={{ color: C.slateSoft }}>Filtrar por tipo de evento:</span>
+              <Chip active={causalFiltro === "todas"} onClick={() => setCausalFiltro("todas")}>Todas</Chip>
+              {tiposEvento.map((t) => (
+                <Chip key={t} active={causalFiltro === t} onClick={() => setCausalFiltro(t)}>{TIPO_EVENTO_LABEL[t] || t}</Chip>
+              ))}
+            </div>
+
+            <div className=" border" style={{ background: C.panel, borderColor: C.line }}>
+              {eventosFiltrados.map((item, i) => (
+                <div key={item.ENTITY_NAME_NORM} className="p-5 flex flex-col md:flex-row gap-4" style={{ borderTop: i > 0 ? `1px solid ${C.line}` : "none" }}>
+                  <div className="md:w-64 shrink-0">
+                    <div className="text-[11px] uppercase tracking-wide font-medium" style={{ color: C.gold }}>{REAL_TIPO_LABEL[item.TIPO_ENTIDAD] || item.TIPO_ENTIDAD}</div>
+                    <div className="text-base font-semibold" style={{ fontFamily: serif, color: C.navyText }}>{item.ENTITY_NAME_NORM}</div>
+                    <div className="text-xs mt-1" style={{ color: C.slateSoft }}>Fecha del evento: {item.FECHA_EVENTO}</div>
+                    <span className="inline-block mt-2 text-[10px] px-2 py-0.5 font-medium" style={{ background: C.amberSoft, color: C.amber }}>
+                      {TIPO_EVENTO_LABEL[item.TIPO_EVENTO] || item.TIPO_EVENTO}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-xs font-semibold mb-1" style={{ color: C.crimson }}>{item.RESOLUCION_SBS}</div>
+                    <p className="text-sm mb-2" style={{ color: C.slate }}>{item.DESCRIPCION}</p>
+                    <div className="text-xs" style={{ color: C.slateSoft }}>
+                      <ScrollText size={12} className="inline mr-1 -mt-0.5" />Fuente: {item.FUENTE}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border p-5" style={{ background: C.panel, borderColor: C.line }}>
+              <div className="flex flex-wrap items-end justify-between gap-4 mb-3">
+                <SectionTitle eyebrow="Historial de clasificación · datos reales (data/clasificaciones)" title="Evolución previa al evento de intervención" />
+                <div className="min-w-[220px]">
+                  <div className="text-[11px] uppercase tracking-wide font-medium mb-1" style={{ color: C.slateSoft }}>Entidad intervenida</div>
+                  <select value={entidadIntervenidaSel || ""} onChange={(e) => setEntidadIntervenidaSel(e.target.value)}
+                    className="w-full px-3 py-1.5 border text-sm" style={{ background: C.panel, borderColor: C.line, color: C.navyText }}>
+                    {REAL_EVENTOS_INTERVENCION.map((e) => <option key={e.ENTITY_NAME_NORM} value={e.ENTITY_NAME_NORM}>{e.ENTITY_NAME_NORM}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {eventoSeleccionado && serieEventoSeleccionado.length > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={serieEventoSeleccionado}>
+                      <CartesianGrid stroke={C.line} vertical={false} />
+                      <XAxis dataKey="corte" tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={{ stroke: C.line }} tickLine={false} />
+                      <YAxis reversed domain={[0, RATING_MASTER_SCALE_INT.length - 1]} ticks={RATING_MASTER_SCALE_INT.map((_, i) => i)}
+                        tickFormatter={(v) => RATING_MASTER_SCALE_INT[v]} tick={{ fontSize: 11, fill: C.slateSoft }} axisLine={false} tickLine={false} width={35} />
+                      <Tooltip formatter={(v, name) => [v == null ? "N/D" : RATING_MASTER_SCALE_INT[v], name]} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      {ecrsConHistorial.map((ecr) => (
+                        <Line key={ecr} type="monotone" dataKey={ecr} name={ecr} stroke={ECR_LINE_COLOR[ecr] || C.navyText} strokeWidth={2} connectNulls dot={{ r: 3 }} />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                  <p className="text-[11px] mt-2" style={{ color: C.slateSoft }}>
+                    Cada punto es una calificación real reportada en los archivos de clasificación de la SBS (<code>data/clasificaciones/</code>) hasta el corte disponible más cercano al evento del {eventoSeleccionado.FECHA_EVENTO}. Escala: A+ (mejor) → E (peor); "N/D" = sin calificación vigente en ese corte.
+                    {serieEventoSeleccionado.length === 1 && " Esta entidad solo cuenta con un corte con dato real en el histórico disponible del proyecto."}
+                  </p>
+                </>
+              ) : (
+                <div className="text-sm py-8 text-center" style={{ color: C.slateSoft }}>
+                  Información no disponible: no se encontró ninguna fila para esta entidad en <code>data/clasificaciones/</code>. No se genera un gráfico para evitar mostrar datos no verificados.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="px-6 py-4 text-center text-[11px]" style={{ color: C.slateSoft }}>
+        Panel construido con fines demostrativos. En "Resumen", "Análisis Histórico" y "Modelo Predictivo", los indicadores de morosidad, ROE, ROA, capital global y cartera son simulaciones ilustrativas y no reemplazan los reportes oficiales de la SBS. Las pestañas "Modelos de Predicción", "Predicción Setiembre" y "Entidades Intervenidas" muestran, sin cálculos adicionales, la salida real del motor (<code>scripts/run_evaluacion.py</code>, <code>scripts/run_prediccion.py</code> y <code>motor/datos/eventos_intervencion.py</code>).
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<SBSDashboard />);
+
+
+</script>
+</body>
+</html>
